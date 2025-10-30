@@ -6,7 +6,13 @@ router = Router()
 
 @router.message(Command("help"))
 async def cmd_help(message: types.Message):
-    await message.answer("Я умею делать следующее...")
+    help_message = (
+        "<b>Привет! Я бот.</b>\n\n"
+        "<i>Вот некоторые доступные команды:</i>\n"
+        "- /start: Начать взаимодействие с ботом\n"
+        "- /help: Получить справку о командах бота"
+    )
+    await message.answer(help_message, parse_mode="HTML")
 
 # Хэндлер на команду /start
 @router.message(Command("start"))
