@@ -1,5 +1,6 @@
 from aiogram import Router, types
 from aiogram.filters.command import Command
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
@@ -17,7 +18,20 @@ async def cmd_help(message: types.Message):
 # Хэндлер на команду /start
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Я эхо-бот. Отправь мне любое сообщение, и я его повторю.")
+    # Создаем объект билдера для Reply-клавиатуры
+    builder = ReplyKeyboardBuilder()
+    
+    # Добавляем кнопки
+    builder.button(text="Start")
+    builder.button(text="/help")
+    
+    # Указываем, сколько кнопок будет в одном ряду (в данном случае 2)
+    builder.adjust(2)
+    
+    await message.answer(
+        "Привет! Я эхо-бот. Отправь мне любое сообщение, и я его повторю.",
+        reply_markup=builder.as_markup(resize_keyboard=True)
+    )
 
 # Хэндлер на остальные текстовые сообщения
 @router.message()
