@@ -38,8 +38,23 @@ async def cmd_start(message: types.Message):
     USER_ID = message.from_user.id
 
 
+# Define your infinite loop function
+async def moex_infinite_loop():
+    global USER_ID
+
+    while True:
+        if USER_ID is not None:
+            print("Infinite loop is running...", flush=True)
+            await bot.send_message(USER_ID, "Infinite loop is running...")
+            # Add your desired logic here
+        await asyncio.sleep(5)  # Sleep for 5 seconds to avoid busy-waiting
+
+
 # Запуск процесса поллинга новых апдейтов
 async def main():
+    # Start the infinite loop as a background task
+    asyncio.create_task(moex_infinite_loop())
+
     # Регистрируем роутер в диспетчере
     dp.include_router(router)
     
