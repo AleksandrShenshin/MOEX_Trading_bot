@@ -24,7 +24,8 @@ async def cmd_start(message: types.Message):
     builder = ReplyKeyboardBuilder()
 
     # Добавляем кнопки
-    builder.button(text="/actions")
+    builder.button(text="Просмотр сигналов")
+    builder.button(text="Добавить сигнал")
     builder.button(text="/help")
 
     # Указываем, сколько кнопок будет в одном ряду (в данном случае 2)

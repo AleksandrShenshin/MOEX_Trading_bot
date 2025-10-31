@@ -15,7 +15,11 @@ async def cmd_help(message: types.Message):
     )
     await message.answer(help_message, parse_mode="HTML")
 
-@router.message(Command("actions"))
+@router.message(F.text == "Просмотр сигналов")
+async def get_list_signal(message: types.Message):
+    await message.answer(f"Активные сигналы: {message.text}")
+
+@router.message(F.text == "Добавить сигнал")
 async def cmd_actions(message: types.Message):
     builder = InlineKeyboardBuilder()
 
@@ -26,11 +30,6 @@ async def cmd_actions(message: types.Message):
         "Нажми на кнопку, чтобы выполнить действие:",
         reply_markup=builder.as_markup()
     )
-
-# Хэндлер на остальные текстовые сообщения
-@router.message()
-async def echo_message(message: types.Message):
-    await message.answer(f"Я получил твое сообщение: {message.text}")
 
 # Хэндлер для обработки нажатия на кнопку "Показать уведомление"
 @router.callback_query(F.data == "show_alert")
@@ -47,3 +46,8 @@ async def handle_edit_message(callback: types.CallbackQuery):
     await callback.message.edit_text("Сообщение было изменено!")
     # Отвечаем на callback, чтобы убрать "часики" на кнопке
     await callback.answer()
+
+# Хэндлер на остальные текстовые сообщения
+@router.message()
+async def unknown_message(message: types.Message):
+    await message.answer(f"Добавить парсинг сообщение: {message.text} -- консоль")
