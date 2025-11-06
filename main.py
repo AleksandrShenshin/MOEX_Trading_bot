@@ -7,12 +7,12 @@ from aiogram.filters.command import Command
 from handlers.basic_handlers import router
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
+from decouple import config
 
-BOT_TOKEN = ''
 USER_ID = None
 
 # Объект бота
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(token=config('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Диспетчер
 dp = Dispatcher()
