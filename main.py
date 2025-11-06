@@ -2,15 +2,18 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
 from aiogram.filters.command import Command
 from handlers.basic_handlers import router
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.client.default import DefaultBotProperties
 
 BOT_TOKEN = ''
 USER_ID = None
 
 # Объект бота
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
 # Диспетчер
 dp = Dispatcher()
 
@@ -33,7 +36,6 @@ async def cmd_start(message: types.Message):
 
     await message.answer(
         "<b>MOEX Trading Bot is running</b>",
-        parse_mode="HTML",
         reply_markup=builder.as_markup(resize_keyboard=True)
     )
     USER_ID = message.from_user.id
