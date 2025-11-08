@@ -31,8 +31,8 @@ async def cmd_start(message: types.Message):
     builder.button(text="Добавить сигнал")
     builder.button(text="/help")
 
-    # Указываем, сколько кнопок будет в одном ряду (в данном случае 2)
-    builder.adjust(2)
+    # Указываем, сколько кнопок будет в одном ряду (в данном случае 2 в первом ряду и одна во втором ряду)
+    builder.adjust(2, 1)
 
     await message.answer(
         "<b>MOEX Trading Bot is running</b>",
