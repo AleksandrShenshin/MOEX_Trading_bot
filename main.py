@@ -36,7 +36,7 @@ async def cmd_start(message: types.Message):
 
     await message.answer(
         "<b>MOEX Trading Bot is running</b>",
-        reply_markup=builder.as_markup(resize_keyboard=True)
+        reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
     )
     USER_ID = message.from_user.id
 
