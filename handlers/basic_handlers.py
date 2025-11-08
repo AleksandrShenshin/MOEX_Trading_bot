@@ -23,29 +23,36 @@ async def get_list_signal(message: types.Message):
 async def cmd_actions(message: types.Message):
     builder = InlineKeyboardBuilder()
 
-    builder.button(text="Показать уведомление", callback_data="show_alert")
-    builder.button(text="Сменить это сообщение", callback_data="edit_message")
+    builder.button(text="Volume", callback_data="typesignal_volume")
+    builder.button(text="Price", callback_data="typesignal_price")
 
     await message.answer(
-        "Нажми на кнопку, чтобы выполнить действие:",
+        "Выберите тип сигнала:",
         reply_markup=builder.as_markup()
     )
 
-# Хэндлер для обработки нажатия на кнопку "Показать уведомление"
-@router.callback_query(F.data == "show_alert")
-async def handle_show_alert(callback: types.CallbackQuery):
-    await callback.answer(
-        "Это всплывающее уведомление!",
-        show_alert=True # Делает уведомление модальным окном
-    )
+@router.callback_query(F.data.startswith("typesignal_"))
+async def handle_set_type_signal(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    type_signal = callback.data.split("_")[1]
 
-# Хэндлер для обработки нажатия на кнопку "Сменить это сообщение"
-@router.callback_query(F.data == "edit_message")
-async def handle_edit_message(callback: types.CallbackQuery):
+    builder.button(text="Si", callback_data=f"ticker_si_{type_signal}")
+    builder.button(text="CNY", callback_data=f"ticker_cny_{type_signal}")
+
     # Редактируем текст исходного сообщения
-    await callback.message.edit_text("Сообщение было изменено!")
+    await callback.message.edit_text(
+        "Выберите инструмент:",
+        reply_markup=builder.as_markup()
+    )
     # Отвечаем на callback, чтобы убрать "часики" на кнопке
-    await callback.answer()
+#    await callback.answer()
+
+@router.callback_query(F.data.startswith("ticker_"))
+async def handle_set_ticker(callback: types.CallbackQuery):
+    # Редактируем текст исходного сообщения
+    await callback.message.edit_text(
+        f"Текущий инструмент и тип сигнала: {callback.data}"
+    )
 
 # Хэндлер на остальные текстовые сообщения
 @router.message()
