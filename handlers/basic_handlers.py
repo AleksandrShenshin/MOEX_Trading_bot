@@ -45,7 +45,7 @@ async def handle_set_type_signal(callback: types.CallbackQuery):
         reply_markup=builder.as_markup()
     )
     # Отвечаем на callback, чтобы убрать "часики" на кнопке
-#    await callback.answer()
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("ticker_"))
 async def handle_set_ticker(callback: types.CallbackQuery):
