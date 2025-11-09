@@ -1,3 +1,4 @@
+import journal
 from aiogram import Router, types, F
 from aiogram.filters.command import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -22,7 +23,18 @@ async def cmd_help(message: types.Message):
 
 @router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
-    await message.answer(f"Активные сигналы: {message.text}")
+    # TODO: возможно нужно брать текущие сигналы из опращиваемой структуры
+    data = await journal.signals_from_file()
+    if data is not None:
+        list_signals = f"Активные сигналы:\n"
+        try:
+            for key, value in data.items():
+                list_signals += f"{key}: {value['ticker']} {value['type_signal']} {value['value']}\n"
+            await message.answer(list_signals)
+        except KeyError:
+            await message.answer("❌ <b>ОШИБКА:</b> получения данных")
+    else:
+        await message.answer(f"Нет активных сигналов")
 
 @router.message(F.text.lower().contains('добавить сигнал'))
 async def cmd_actions(message: types.Message, state: FSMContext):
