@@ -7,6 +7,8 @@ from aiogram.filters.command import Command
 from handlers.basic_handlers import router
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
 from decouple import config
 
 USER_ID = None
@@ -15,13 +17,16 @@ USER_ID = None
 bot = Bot(token=config('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Диспетчер
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
 
 # Хэндлер на команду /start
 @dp.message(Command("start"))
-async def cmd_start(message: types.Message):
+async def cmd_start(message: types.Message, state: FSMContext):
     global USER_ID
+
+    await state.clear()
+#    await state.update_data(user_id=message.from_user.id)
 
     # Создаем объект билдера для Reply-клавиатуры
     builder = ReplyKeyboardBuilder()
