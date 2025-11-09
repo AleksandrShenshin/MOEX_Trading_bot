@@ -32,9 +32,9 @@ async def cmd_start(message: types.Message, state: FSMContext):
     builder = ReplyKeyboardBuilder()
 
     # Добавляем кнопки
-    builder.button(text="Просмотр сигналов")
-    builder.button(text="Добавить сигнал")
-    builder.button(text="/help")
+    builder.button(text="📋 Просмотр сигналов")
+    builder.button(text="➕ Добавить сигнал")
+    builder.button(text="💡 Readme.md")
 
     # Указываем, сколько кнопок будет в одном ряду (в данном случае 2 в первом ряду и одна во втором ряду)
     builder.adjust(2, 1)

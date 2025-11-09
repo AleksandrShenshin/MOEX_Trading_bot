@@ -10,7 +10,7 @@ router = Router()
 class Form(StatesGroup):
     value = State()
 
-@router.message(Command("help"))
+@router.message(F.text.lower().contains('readme'))
 async def cmd_help(message: types.Message):
     help_message = (
         "<b>Привет! Я бот.</b>\n\n"
@@ -20,11 +20,11 @@ async def cmd_help(message: types.Message):
     )
     await message.answer(help_message, parse_mode="HTML")
 
-@router.message(F.text == "Просмотр сигналов")
+@router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
     await message.answer(f"Активные сигналы: {message.text}")
 
-@router.message(F.text == "Добавить сигнал")
+@router.message(F.text.lower().contains('добавить сигнал'))
 async def cmd_actions(message: types.Message, state: FSMContext):
     await state.clear()
     builder = InlineKeyboardBuilder()
