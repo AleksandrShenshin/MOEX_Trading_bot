@@ -13,7 +13,7 @@ async def signals_from_file():
     try:
         with open(file_signals, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError) as e:
         return None
     else:
         return data
