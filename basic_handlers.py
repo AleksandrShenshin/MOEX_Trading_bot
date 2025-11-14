@@ -1,9 +1,11 @@
 import journal
 from aiogram import Router, types, F
 from aiogram.filters.command import Command
+from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from general import get_support_instruments
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
@@ -55,8 +57,15 @@ async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContex
     type_signal = callback.data.split("_")[1]
     await state.update_data(type_signal=type_signal)
 
-    builder.button(text="Si", callback_data=f"ticker_si_{type_signal}")
-    builder.button(text="CNY", callback_data=f"ticker_cny_{type_signal}")
+    supp_instr = await get_support_instruments()
+    for text_ticker, param_ticker in supp_instr.items():
+        builder.row(
+            InlineKeyboardButton(
+                text=text_ticker,
+                callback_data=f'ticker_{text_ticker}'
+            )
+        )
+    builder.adjust(3)
 
     # Редактируем текст исходного сообщения
     await callback.message.edit_text(

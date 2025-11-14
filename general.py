@@ -10,7 +10,7 @@ async def set_user_id(user_id):
     USER_ID = user_id
 
 
-async def get_list_ticker():
+async def get_support_instruments():
     try:
         return ast.literal_eval(config('FUTURES_LIST'))
     except (SyntaxError, ValueError) as e:
