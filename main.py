@@ -9,9 +9,8 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
+from general import moex_infinite_loop, set_user_id
 from decouple import config
-
-USER_ID = None
 
 # Объект бота
 bot = Bot(token=config('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -23,10 +22,8 @@ dp = Dispatcher(storage=MemoryStorage())
 # Хэндлер на команду /start
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
-    global USER_ID
-
     await state.clear()
-#    await state.update_data(user_id=message.from_user.id)
+    await set_user_id(message.from_user.id)
 
     # Создаем объект билдера для Reply-клавиатуры
     builder = ReplyKeyboardBuilder()
@@ -43,19 +40,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
         "<b>MOEX Trading Bot is running</b>",
         reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
     )
-    USER_ID = message.from_user.id
-
-
-# Define your infinite loop function
-async def moex_infinite_loop():
-    global USER_ID
-
-    while True:
-        if USER_ID is not None:
-            print("Infinite loop is running...", flush=True)
-            await bot.send_message(USER_ID, "Infinite loop is running...")
-            # Add your desired logic here
-        await asyncio.sleep(5)  # Sleep for 5 seconds to avoid busy-waiting
 
 
 # Запуск процесса поллинга новых апдейтов
