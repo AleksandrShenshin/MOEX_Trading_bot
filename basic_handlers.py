@@ -15,13 +15,23 @@ class Form(StatesGroup):
 
 @router.message(F.text.lower().contains('readme'))
 async def cmd_help(message: types.Message):
-    help_message = (
-        "<b>Привет! Я бот.</b>\n\n"
-        "<i>Вот некоторые доступные команды:</i>\n"
-        "- /start: Начать взаимодействие с ботом\n"
-        "- /help: Получить справку о командах бота"
-    )
-    await message.answer(help_message, parse_mode="HTML")
+    readme_message = "<b>Поддерживаемые команды:</b>\n"
+    fl_wr_line = False
+
+    try:
+        with open('README.md', "r", encoding="utf-8") as file:
+            for line in file:
+                if fl_wr_line:
+                    if '<<<<<' in line:
+                        break
+                    else:
+                        readme_message += line
+                elif '>>>>>' in line:
+                    fl_wr_line = True
+    except FileNotFoundError:
+        pass
+    finally:
+        await message.answer(readme_message)
 
 @router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
