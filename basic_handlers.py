@@ -13,6 +13,7 @@ router = Router()
 class Form(StatesGroup):
     value = State()
 
+@router.message(Command("help"))
 @router.message(F.text.lower().contains('readme'))
 async def cmd_help(message: types.Message):
     readme_message = "<b>Поддерживаемые команды:</b>\n"
