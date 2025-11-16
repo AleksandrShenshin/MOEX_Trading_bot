@@ -35,6 +35,18 @@ async def cmd_help(message: types.Message):
         await message.answer(readme_message)
 
 
+@router.message(Command("get_list_ticker"))
+async def get_support_ticker(message: types.Message):
+    support_ticker = ""
+    supp_instr = await get_support_instruments()
+    for text_ticker, param_ticker in supp_instr.items():
+        if not support_ticker:
+            support_ticker += text_ticker
+        else:
+            support_ticker += f", {text_ticker}"
+    await message.answer(support_ticker)
+
+
 @router.message(Command("get_signals"))
 @router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
