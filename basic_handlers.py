@@ -34,6 +34,8 @@ async def cmd_help(message: types.Message):
     finally:
         await message.answer(readme_message)
 
+
+@router.message(Command("get_signals"))
 @router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
     # TODO: возможно нужно брать текущие сигналы из опращиваемой структуры
