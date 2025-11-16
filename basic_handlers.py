@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from general import get_support_instruments
+from general import get_support_instruments, get_support_signals
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
@@ -68,8 +68,15 @@ async def cmd_actions(message: types.Message, state: FSMContext):
     await state.clear()
     builder = InlineKeyboardBuilder()
 
-    builder.button(text="Volume", callback_data="typesignal_volume")
-    builder.button(text="Price", callback_data="typesignal_price")
+    supp_signals = await get_support_signals()
+    for text_signal, param_signal in supp_signals.items():
+        builder.row(
+            InlineKeyboardButton(
+                text=text_signal,
+                callback_data=f'typesignal_{text_signal.lower()}'
+            )
+        )
+    builder.adjust(2)
 
     await message.answer(
         "Выберите тип сигнала:",

@@ -17,6 +17,13 @@ async def get_support_instruments():
         return None
 
 
+async def get_support_signals():
+    try:
+        return ast.literal_eval(config('TYPES_SIGNAL'))
+    except (SyntaxError, ValueError) as e:
+        return None
+
+
 # Define your infinite loop function
 async def moex_infinite_loop():
     global USER_ID
