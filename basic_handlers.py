@@ -52,7 +52,7 @@ async def get_support_ticker(message: types.Message):
 async def get_list_signal(message: types.Message):
     # TODO: возможно нужно брать текущие сигналы из опращиваемой структуры
     data = await journal.signals_from_file()
-    if data is not None:
+    if len(data) != 0:
         list_signals = f"Активные сигналы:\n"
         try:
             for key, value in data.items():

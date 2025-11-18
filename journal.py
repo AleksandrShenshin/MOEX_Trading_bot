@@ -10,10 +10,11 @@ async def signals_to_file(signals):
 
 
 async def signals_from_file():
+    data = {}
     try:
         with open(file_signals, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        return None
-    else:
+        pass
+    finally:
         return data
