@@ -1,5 +1,6 @@
 import journal
 from aiogram import Router, types, F
+from aiogram.filters import CommandObject
 from aiogram.filters.command import Command
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -10,8 +11,10 @@ from general import get_support_instruments, get_support_signals
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
 
+
 class Form(StatesGroup):
     value = State()
+
 
 @router.message(Command("help"))
 @router.message(F.text.lower().contains('readme'))
@@ -63,6 +66,7 @@ async def get_list_signal(message: types.Message):
     else:
         await message.answer(f"Нет активных сигналов")
 
+
 @router.message(F.text.lower().contains('добавить сигнал'))
 async def cmd_actions(message: types.Message, state: FSMContext):
     await state.clear()
@@ -83,6 +87,7 @@ async def cmd_actions(message: types.Message, state: FSMContext):
         reply_markup=builder.as_markup()
     )
 
+
 @router.callback_query(F.data.startswith("typesignal_"))
 async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
@@ -91,6 +96,7 @@ async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContex
 
     supp_instr = await get_support_instruments()
     for text_ticker, param_ticker in supp_instr.items():
+        # TODO: заменить text_ticker на действующий фьючерс
         builder.row(
             InlineKeyboardButton(
                 text=text_ticker,
@@ -106,6 +112,7 @@ async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContex
     )
     # Отвечаем на callback, чтобы убрать "часики" на кнопке
     await callback.answer()
+
 
 @router.callback_query(F.data.startswith("ticker_"))
 async def handle_set_ticker(callback: types.CallbackQuery, state: FSMContext):
@@ -124,23 +131,102 @@ async def handle_set_ticker(callback: types.CallbackQuery, state: FSMContext):
     )
     await state.set_state(Form.value)
 
+
 @router.callback_query(F.data == "cancel_signal")
 async def handle_cancel_signal(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await state.clear()
+
+
+async def add_signal(message, ticker, type_signal, value):
+    supp_instr = await get_support_instruments()
+    for text_ticker, param_ticker in supp_instr.items():
+        if text_ticker.lower() == ticker.lower():
+            try:
+                precision = int(param_ticker['precision'])
+                break
+            except (KeyError, NameError) as e:
+                await message.answer(f"❌ <b>ERROR:</b> add_signal(): get 'precision' except {e}")
+                return
+    else:
+        await message.answer(f"❌ <b>ERROR:</b> тикер {ticker} не поддерживается")
+        return
+
+    supp_signals = await get_support_signals()
+    for text_signal, param_signal in supp_signals.items():
+        if text_signal.lower() == type_signal.lower():
+            break
+    else:
+        await message.answer(f"❌ <b>ERROR:</b> тип сигнала {type_signal} не корректный")
+        return
+
+    if type_signal.lower() == 'volume':
+        try:
+            int(value)
+        except ValueError:
+            await message.answer(f"❌ <b>ERROR:</b> значение {value} должно быть целым для {type_signal}")
+            return
+    elif type_signal.lower() == 'price':
+        value = value.replace(',', '.')
+        try:
+            float(value)
+        except ValueError:
+            await message.answer(f"❌ <b>ERROR:</b> значение {value} должно содержать только цифры")
+            return
+
+        if precision == 0:
+            if '.' in value:
+                if int(value.split('.')[1]) > 0:
+                    await message.answer(f"❌ <b>ERROR:</b> значение {value} не должно содержать дробной части")
+                    return
+        else:
+            try:
+                if len(value.split('.')[1]) > precision:
+                    await message.answer(f"❌ <b>ERROR:</b> значение дробной части {value} не должно содержать "
+                                         f"количество знаков > {precision}")
+                    return
+            except IndexError:
+                pass
+
+    # TODO: печатать полный тикер
+    ret_val, err_mess = await journal.signals_to_file(ticker.lower(), type_signal.lower(), value)
+    if not ret_val:
+        await message.answer(f"📝 ✅ <b>set {ticker.lower()} {type_signal.lower()} {value}</b>")
+    else:
+        await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
+
 
 @router.message(F.text, Form.value)
 async def form_state(message: types.Message, state: FSMContext):
     await state.update_data(value=message.text)
     data = await state.get_data()
 
-    # TODO: проверить введенное число на кол-во знаков после запятой https://habr.com/ru/articles/822061/
-
     await message.delete()
     await message.bot.delete_message(chat_id=message.from_user.id, message_id=data['msg_id_for_del'])
 
-    await message.answer(f"📝 ✅ <b>set {data['ticker']} {data['type_signal']} {data['value']}</b>")
+    await add_signal(message, data['ticker'], data['type_signal'], data['value'])
     await state.clear()
+
+
+@router.message(Command("set"))
+async def set_console(message: types.Message, command: CommandObject):
+    command_args: str = command.args
+    ticker, param_signal, value = command_args.split()
+
+    supp_signals = await get_support_signals()
+    for text_signal, param_val in supp_signals.items():
+        try:
+            if param_signal != param_val['param']:
+                continue
+        except KeyError as e:
+            await message.answer(f"❌ <b>ERROR:</b> set_console(): KeyError {e}")
+            break
+        else:
+            await add_signal(message, ticker, text_signal, value)
+            break
+    else:
+        await message.answer(f"❌ <b>ERROR:</b> параметр {param_signal} не корректный.")
+
 
 # Хэндлер на остальные текстовые сообщения
 @router.message()
