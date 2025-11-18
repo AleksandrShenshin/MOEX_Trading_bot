@@ -41,9 +41,9 @@ async def get_support_ticker(message: types.Message):
     supp_instr = await get_support_instruments()
     for text_ticker, param_ticker in supp_instr.items():
         if not support_ticker:
-            support_ticker += text_ticker
+            support_ticker += text_ticker.lower()
         else:
-            support_ticker += f", {text_ticker}"
+            support_ticker += f", {text_ticker.lower()}"
     await message.answer(support_ticker)
 
 
