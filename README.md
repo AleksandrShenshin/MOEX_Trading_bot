@@ -19,6 +19,10 @@ _precision_ - точность цены после запятой
 _Price, Volume_ - название которое будет видно в боте
 _param_ - -p - price, -v - volume
 
+> [!WARNING]
+> Для работы необходимо в директорию проекта установить следующие пакеты:
+> `git clone git@github.com:AleksandrShenshin/iss_moex.git`
+
 ## Примеры команд из строки
 >>>>>
 /get_list_ticker - поддерживаемые тикеры
