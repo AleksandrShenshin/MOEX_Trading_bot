@@ -55,14 +55,28 @@ async def get_support_ticker(message: types.Message):
 @router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
     # TODO: возможно нужно брать текущие сигналы из опращиваемой структуры
-    # TODO: добавить сортировку 1) тикеру 2) цене
     data = await journal.get_signals_from_file()
     if len(data) != 0:
-        list_signals = f"Активные сигналы:\n"
+        msg_to_print = f"Активные сигналы:\n"
+
+        list_signals = []
+        for key, value in data.items():
+            curr_signal = value.copy()
+            curr_signal['id'] = key
+            curr_signal['value'] = float(value['value'])
+            list_signals.append(curr_signal)
+
+        # Сортировка по value
+        list_signals = sorted(list_signals, key=lambda d: d['value'])
+        # Сортировка по type_signal
+        list_signals = sorted(list_signals, key=lambda d: d['type_signal'])
+        # Сортировка по ticker
+        list_signals = sorted(list_signals, key=lambda d: d['ticker'])
+
         try:
-            for key, value in data.items():
-                list_signals += f"{key}: {value['ticker']} {value['type_signal']} {value['value']}\n"
-            await message.answer(list_signals)
+            for signal in list_signals:
+                msg_to_print += f"{signal['id']}: {signal['ticker']} {signal['type_signal']} {data[signal['id']]['value']}\n"
+            await message.answer(msg_to_print)
         except KeyError:
             await message.answer("❌ <b>ОШИБКА:</b> получения данных")
     else:
