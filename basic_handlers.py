@@ -14,6 +14,7 @@ router = Router()
 
 class Form(StatesGroup):
     value = State()
+    del_id = State()
 
 
 @router.message(Command("help"))
@@ -227,6 +228,51 @@ async def set_console(message: types.Message, command: CommandObject):
             break
     else:
         await message.answer(f"❌ <b>ERROR:</b> параметр {param_signal} не корректный.")
+
+
+@router.message(F.text.lower().contains('удалить сигнал'))
+async def cmd_del_signal(message: types.Message, state: FSMContext):
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="Отмена", callback_data=f"cancel_signal")
+
+    msg = await message.answer(
+        "Введите ID сигнала для удаления:",
+        reply_markup=builder.as_markup()
+    )
+    await state.update_data(msg_id_for_del=msg.message_id)
+    await state.set_state(Form.del_id)
+
+
+async def del_signal(message, id_signal):
+    ret_val, err_mess = await journal.del_signal_from_file(id_signal)
+    if ret_val:
+        await message.answer(f"❌ <b>ERROR:</b> удаления сигнала: {err_mess}")
+    else:
+        await message.answer(f"❎ <b>OK:</b> сигнал id={id_signal} успешно удалён.")
+
+
+@router.message(F.text, Form.del_id)
+async def form_del_id(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+
+    await message.delete()
+    await message.bot.delete_message(chat_id=message.from_user.id, message_id=data['msg_id_for_del'])
+
+    await del_signal(message, message.text)
+    await state.clear()
+
+
+@router.message(Command("del"))
+async def del_console(message: types.Message, command: CommandObject):
+    id_signal: str = command.args
+    try:
+        int(id_signal)
+    except ValueError:
+        await message.answer(f"❌ <b>ERROR:</b> значение id_signal должно быть целым.")
+        return
+
+    await del_signal(message, id_signal)
 
 
 # Хэндлер на остальные текстовые сообщения

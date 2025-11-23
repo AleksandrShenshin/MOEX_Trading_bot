@@ -35,3 +35,17 @@ async def set_signal_to_file(ticker, type_signal, value):
         json.dump(signals, f, indent=4, sort_keys=True, ensure_ascii=False)
 
     return 0, None
+
+
+async def del_signal_from_file(id_signal):
+    signals = await get_signals_from_file()
+    try:
+        del signals[id_signal]
+    except KeyError:
+        # id not found
+        return -1, f"id={id_signal} не найден"
+
+    with open(file_signals, "w", encoding="utf-8") as f:
+        json.dump(signals, f, indent=4, sort_keys=True, ensure_ascii=False)
+
+    return 0, None
