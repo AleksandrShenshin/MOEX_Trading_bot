@@ -54,7 +54,8 @@ async def get_support_ticker(message: types.Message):
 @router.message(F.text.lower().contains('просмотр сигналов'))
 async def get_list_signal(message: types.Message):
     # TODO: возможно нужно брать текущие сигналы из опращиваемой структуры
-    data = await journal.signals_from_file()
+    # TODO: добавить сортировку 1) тикеру 2) цене
+    data = await journal.get_signals_from_file()
     if len(data) != 0:
         list_signals = f"Активные сигналы:\n"
         try:

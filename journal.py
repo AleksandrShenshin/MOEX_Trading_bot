@@ -4,7 +4,7 @@ import asyncio
 file_signals = "signals.json"
 
 
-async def signals_from_file():
+async def get_signals_from_file():
     data = {}
     try:
         with open(file_signals, "r", encoding="utf-8") as f:
@@ -16,7 +16,7 @@ async def signals_from_file():
 
 
 async def signals_to_file(ticker, type_signal, value):
-    signals = await signals_from_file()
+    signals = await get_signals_from_file()
     for i in range(1, 100):
         # Поиск свободного id
         for id, param_signal in signals.items():
