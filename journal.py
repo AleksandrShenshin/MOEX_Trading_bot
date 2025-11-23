@@ -15,7 +15,7 @@ async def get_signals_from_file():
         return data
 
 
-async def signals_to_file(ticker, type_signal, value):
+async def set_signal_to_file(ticker, type_signal, value):
     signals = await get_signals_from_file()
     for i in range(1, 100):
         # Поиск свободного id

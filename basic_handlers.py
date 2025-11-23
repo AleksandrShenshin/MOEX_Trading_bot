@@ -190,7 +190,7 @@ async def add_signal(message, ticker, type_signal, value):
                 pass
 
     # TODO: печатать полный тикер
-    ret_val, err_mess = await journal.signals_to_file(ticker.lower(), type_signal.lower(), value)
+    ret_val, err_mess = await journal.set_signal_to_file(ticker.lower(), type_signal.lower(), value)
     if not ret_val:
         await message.answer(f"📝 ✅ <b>set {ticker.lower()} {type_signal.lower()} {value}</b>")
     else:
