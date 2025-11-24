@@ -7,17 +7,17 @@
 > [!TIP]
 > Перед запуском бота необходимо в файле **.env** установить следующие параметры:
 > - **BOT_TOKEN** = 8298363621:AAGKkemhznX0JmbzrIHnjrtaxjTTbFOYLX0 (указываем токен Telegram bot)
-> - **FUTURES_LIST** = _{'Si': {'main_ticker': 'Si', 'precision': '0'}, 'CNY': {'main_ticker': 'CR', 'precision': '3'}}_
-(список поддерживаемых фьючерсов)
-Формат 
-_CNY_ - название которое будет видно в боте
-_main_ticker_ - первые две буквы тикера (неизменны при смене контракта)
-_precision_ - точность цены после запятой
-> - **TYPES_SIGNAL** = _{'Price': {'param': '-p'}, 'Volume': {'param': '-v'}}_
-(список поддерживаемых сигналов)
-Формат 
-_Price, Volume_ - название которое будет видно в боте
-_param_ - -p - price, -v - volume
+> - **FUTURES_LIST** = _{'Si': {'main_ticker': 'Si', 'precision': '0'}, 'CNY': {'main_ticker': 'CR', 'precision': '3'}}_  
+(список поддерживаемых фьючерсов)  
+Формат  
+_CNY_ - название которое будет видно в боте  
+_main_ticker_ - первые две буквы тикера (неизменны при смене контракта)  
+_precision_ - точность цены после запятой  
+> - **TYPES_SIGNAL** = _{'Price': {'param': '-p'}, 'Volume': {'param': '-v'}}_  
+(список поддерживаемых сигналов)  
+Формат  
+_Price, Volume_ - название которое будет видно в боте  
+_param_ - -p - price, -v - volume  
 
 > [!WARNING]
 > Для работы необходимо в директорию проекта установить следующие пакеты:  
@@ -26,11 +26,11 @@ _param_ - -p - price, -v - volume
 
 ## Примеры команд из строки
 >>>>>
-/get_list_ticker - поддерживаемые тикеры
-/get_signals - список установленных сигналов
-/del <b>id_signal</b> - удалить сигнал по его ID
-/set <b>TICKER</b> <b>TYPE_SIGNAL</b> <b>VALUE</b>
-<b>TICKER</b>: сокращенный (si, cr), полный (siz5)
-<b>TYPE_SIGNAL</b>: -p - price, -v - volume
-<b>VALUE</b>: значение целое или дробное
+/get_list_ticker - поддерживаемые тикеры  
+/get_signals - список установленных сигналов  
+/del <b>id_signal</b> - удалить сигнал по его ID  
+/set <b>TICKER</b> <b>TYPE_SIGNAL</b> <b>VALUE</b>  
+<b>TICKER</b>: сокращенный (si, cr), полный (siz5)  
+<b>TYPE_SIGNAL</b>: -p - price, -v - volume  
+<b>VALUE</b>: значение целое или дробное  
 <<<<<
