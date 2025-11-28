@@ -1,3 +1,4 @@
+import os
 import asyncio
 import logging
 
@@ -10,6 +11,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from general import moex_infinite_loop, set_user_id
+from general import get_support_instruments, get_ticker_family
 from decouple import config
 
 # Объект бота
@@ -24,6 +26,17 @@ dp = Dispatcher(storage=MemoryStorage())
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     await set_user_id(message.from_user.id)
+
+    # TODO: добавить ежедневную задачу для обновления current_ticker
+    curr_instr = {}
+    supp_instr = await get_support_instruments()
+    for short_ticker in supp_instr:
+        status, ret_val, err_msg = await get_ticker_family(short_ticker)
+        if status:
+            await message.answer(f"❌ <b>ОШИБКА:</b> {err_msg}")
+            os._exit(-1)
+        curr_instr[short_ticker] = ret_val
+    await state.update_data(supp_tools=curr_instr)
 
     # Создаем объект билдера для Reply-клавиатуры
     builder = ReplyKeyboardBuilder()
