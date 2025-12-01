@@ -1,4 +1,5 @@
 import journal
+import t_invest_lib.tinv as tinv
 from aiogram import Router, types, F
 from aiogram.filters import CommandObject
 from aiogram.filters.command import Command
@@ -86,8 +87,10 @@ async def get_list_signal(message: types.Message):
 async def state_clear_soft(state):
     data = await state.get_data()
     supp_tools = data['supp_tools']
+    signals = data['signals']
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
+    await state.update_data(signals=signals)
 
 
 @router.message(F.text.lower().contains('добавить сигнал'))
@@ -169,12 +172,15 @@ async def add_signal(message, state, ticker, type_signal, value):
             if short_ticker == ticker.lower()[0:2]:
                 if len(ticker) == 2:
                     ticker = param_family['current_ticker']
-                if ticker.lower() in (element.lower() for element in param_family['all_list']):
-                    precision = int(param_family['precision'])
-                    break
+                for element in param_family['all_list']:
+                    if ticker.lower() == element.lower():
+                        ticker = element
+                        precision = int(param_family['precision'])
+                        break
                 else:
                     await message.answer(f"❌ <b>ERROR:</b> add_signal(): тикер {ticker} не поддерживается!")
                     return
+                break
         else:
             await message.answer(f"❌ <b>ERROR:</b> add_signal(): тикер {ticker} не поддерживается!")
             return
@@ -221,11 +227,15 @@ async def add_signal(message, state, ticker, type_signal, value):
         except IndexError:
             pass
 
-    ret_val, err_mess = await journal.set_signal_to_file(ticker.lower(), type_signal.lower(), value)
-    if not ret_val:
-        await message.answer(f"📝 ✅ <b>set {ticker.lower()} {type_signal.lower()} {value}</b>")
-    else:
+    status, figi, err_mess = await tinv.get_figi_instrument(ticker, 'SPBFUT')
+    if status:
         await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
+    else:
+        ret_val, err_mess = await journal.set_signal_to_file(ticker, type_signal.lower(), value, figi)
+        if not ret_val:
+            await message.answer(f"📝 ✅ <b>set {ticker} {type_signal.lower()} {value}</b>")
+        else:
+            await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
 
 
 @router.message(F.text, Form.value)

@@ -13,6 +13,7 @@ from aiogram.fsm.context import FSMContext
 from general import moex_infinite_loop, set_user_id
 from general import get_support_instruments, get_ticker_family
 from decouple import config
+import journal
 
 # Объект бота
 bot = Bot(token=config('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -20,10 +21,13 @@ bot = Bot(token=config('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=Par
 # Диспетчер
 dp = Dispatcher(storage=MemoryStorage())
 
+# TODO: добавить автоматический поиск прострелов
+
 
 # Хэндлер на команду /start
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
+    stat_init = ''
     await state.clear()
     await set_user_id(message.from_user.id)
 
@@ -37,6 +41,17 @@ async def cmd_start(message: types.Message, state: FSMContext):
             os._exit(-1)
         curr_instr[short_ticker] = ret_val
     await state.update_data(supp_tools=curr_instr)
+    stat_init = "✅ Получение тикеров"
+    msg = await message.answer(stat_init)
+
+    # TODO: добавить получение сигналов из файла
+    data = await journal.get_signals_from_file()
+    await state.update_data(signals=data)
+    stat_init = f"{stat_init}\n✅ Получение сигналов"
+    await message.bot.edit_message_text(stat_init, chat_id=message.from_user.id, message_id=msg.message_id)
+
+    # Start the infinite loop as a background task
+    asyncio.create_task(moex_infinite_loop())
 
     # Создаем объект билдера для Reply-клавиатуры
     builder = ReplyKeyboardBuilder()
@@ -58,9 +73,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
 # Запуск процесса поллинга новых апдейтов
 async def main():
-    # Start the infinite loop as a background task
-    asyncio.create_task(moex_infinite_loop())
-
     # Регистрируем роутер в диспетчере
     dp.include_router(router)
     

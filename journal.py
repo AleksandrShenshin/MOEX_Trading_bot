@@ -15,7 +15,7 @@ async def get_signals_from_file():
         return data
 
 
-async def set_signal_to_file(ticker, type_signal, value):
+async def set_signal_to_file(ticker, type_signal, value, figi):
     signals = await get_signals_from_file()
     for i in range(1, 100):
         # Поиск свободного id
@@ -29,7 +29,7 @@ async def set_signal_to_file(ticker, type_signal, value):
             id = i
             break
 
-    signals[str(id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value}
+    signals[str(id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value, 'figi': figi}
 
     with open(file_signals, "w", encoding="utf-8") as f:
         json.dump(signals, f, indent=4, sort_keys=True, ensure_ascii=False)
