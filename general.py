@@ -73,9 +73,27 @@ async def get_ticker_family(short_ticker):
     return 0, ticker_family, ''
 
 
+async def update_current_ticker(state):
+    curr_instr = {}
+    supp_instr = await get_support_instruments()
+    for short_ticker in supp_instr:
+        status, ret_val, err_msg = await get_ticker_family(short_ticker)
+        if status:
+            return -1, err_msg
+        ret_val['date_update'] = datetime.now().strftime("%Y-%m-%d")
+        curr_instr[short_ticker] = ret_val
+
+    await state.update_data(supp_tools=curr_instr)
+    return 0, None
+
+
 # Define your infinite loop function
 async def moex_infinite_loop():
     global USER_ID
+
+    # TODO: добавить ежедневную задачу для обновления update_current_ticker
+    # проверить date_update в supp_tools, если не совпадает - обновить
+    # https://www.slingacademy.com/article/python-asyncio-run-a-task-at-a-certain-time-every-day/
 
     while True:
         if USER_ID is not None:

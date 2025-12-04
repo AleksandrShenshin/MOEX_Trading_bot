@@ -10,8 +10,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
-from general import moex_infinite_loop, set_user_id
-from general import get_support_instruments, get_ticker_family
+from general import moex_infinite_loop, set_user_id, update_current_ticker
 from decouple import config
 import journal
 
@@ -31,20 +30,14 @@ async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     await set_user_id(message.from_user.id)
 
-    # TODO: добавить ежедневную задачу для обновления current_ticker
-    curr_instr = {}
-    supp_instr = await get_support_instruments()
-    for short_ticker in supp_instr:
-        status, ret_val, err_msg = await get_ticker_family(short_ticker)
-        if status:
-            await message.answer(f"❌ <b>ОШИБКА:</b> {err_msg}")
-            os._exit(-1)
-        curr_instr[short_ticker] = ret_val
-    await state.update_data(supp_tools=curr_instr)
-    stat_init = "✅ Получение тикеров"
-    msg = await message.answer(stat_init)
+    ret_val, err_msg = await update_current_ticker(state)
+    if ret_val:
+        await message.answer(f"❌ <b>ОШИБКА:</b> {err_msg}")
+        os._exit(-1)
+    else:
+        stat_init = "✅ Получение тикеров"
+        msg = await message.answer(stat_init)
 
-    # TODO: добавить получение сигналов из файла
     data = await journal.get_signals_from_file()
     await state.update_data(signals=data)
     stat_init = f"{stat_init}\n✅ Получение сигналов"

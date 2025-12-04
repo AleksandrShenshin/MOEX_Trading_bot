@@ -86,8 +86,16 @@ async def get_list_signal(message: types.Message):
 
 async def state_clear_soft(state):
     data = await state.get_data()
-    supp_tools = data['supp_tools']
-    signals = data['signals']
+    try:
+        supp_tools = data['supp_tools']
+    except KeyError:
+        supp_tools = {}
+
+    try:
+        signals = data['signals']
+    except KeyError:
+        signals = {}
+
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
     await state.update_data(signals=signals)
