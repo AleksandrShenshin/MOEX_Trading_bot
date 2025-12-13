@@ -93,8 +93,20 @@ async def update_current_ticker(state):
 
 
 async def task_upd_curr_ticker(state):
+    global USER_ID
+    global lock_state
     while True:
-        update_current_ticker(state)
+        ret_val, err_msg = await update_current_ticker(state)
+        if ret_val:
+            lock_state.acquire()
+            data = await state.get_data()
+            lock_state.release()
+            try:
+                bot = data['bot']
+                await bot.send_message(USER_ID, f"❌ <b>ОШИБКА:</b> update_current_ticker(): {err_msg}")
+            except KeyError:
+                pass
+
         # Run every 1 hour
         await asyncio.sleep(1*60*60)
 
@@ -108,6 +120,5 @@ async def moex_infinite_loop(state: FSMContext):
     while True:
         if USER_ID is not None:
             print("Infinite loop is running...", flush=True)
-#            await bot.send_message(USER_ID, "Infinite loop is running...")
             # Add your desired logic here
         await asyncio.sleep(5)  # Sleep for 5 seconds to avoid busy-waiting

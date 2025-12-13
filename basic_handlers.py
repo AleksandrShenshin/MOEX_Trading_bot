@@ -98,9 +98,15 @@ async def state_clear_soft(state):
     except KeyError:
         signals = {}
 
+    try:
+        bot = data['bot']
+    except KeyError:
+        bot = None
+
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
     await state.update_data(signals=signals)
+    await state.update_data(bot=bot)
     lock_state.release()
 
 
