@@ -8,6 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from general import get_support_instruments, get_support_signals
+from general import lock_state
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
@@ -85,6 +86,7 @@ async def get_list_signal(message: types.Message):
 
 
 async def state_clear_soft(state):
+    lock_state.acquire()
     data = await state.get_data()
     try:
         supp_tools = data['supp_tools']
@@ -99,6 +101,7 @@ async def state_clear_soft(state):
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
     await state.update_data(signals=signals)
+    lock_state.release()
 
 
 @router.message(F.text.lower().contains('добавить сигнал'))
@@ -127,8 +130,10 @@ async def cmd_actions(message: types.Message, state: FSMContext):
 async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     type_signal = callback.data.split("_")[1]
+    lock_state.acquire()
     await state.update_data(type_signal=type_signal)
     data = await state.get_data()
+    lock_state.release()
 
     for short_ticker, val_short_ticker in data['supp_tools'].items():
         text_ticker = val_short_ticker['current_ticker']
@@ -153,9 +158,11 @@ async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContex
 async def handle_set_ticker(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     ticker = callback.data.split("_")[1]
+    lock_state.acquire()
     await state.update_data(ticker=ticker)
     await state.update_data(msg_id_for_del=callback.message.message_id)
     data = await state.get_data()
+    lock_state.release()
 
     builder.button(text="Отмена", callback_data=f"cancel_signal")
 
@@ -164,7 +171,9 @@ async def handle_set_ticker(callback: types.CallbackQuery, state: FSMContext):
         f"Введите значение <b>{data['ticker']}</b> <b>{data['type_signal']:}</b>",
         reply_markup=builder.as_markup()
     )
+    lock_state.acquire()
     await state.set_state(Form.value)
+    lock_state.release()
 
 
 @router.callback_query(F.data == "cancel_signal")
@@ -175,7 +184,9 @@ async def handle_cancel_signal(callback: types.CallbackQuery, state: FSMContext)
 
 async def add_signal(message, state, ticker, type_signal, value):
     try:
+        lock_state.acquire()
         support_tools = await state.get_data()
+        lock_state.release()
         for short_ticker, param_family in support_tools['supp_tools'].items():
             if short_ticker == ticker.lower()[0:2]:
                 if len(ticker) == 2:
@@ -248,8 +259,10 @@ async def add_signal(message, state, ticker, type_signal, value):
 
 @router.message(F.text, Form.value)
 async def form_state(message: types.Message, state: FSMContext):
+    lock_state.acquire()
     await state.update_data(value=message.text)
     data = await state.get_data()
+    lock_state.release()
 
     await message.delete()
     await message.bot.delete_message(chat_id=message.from_user.id, message_id=data['msg_id_for_del'])
@@ -288,8 +301,10 @@ async def cmd_del_signal(message: types.Message, state: FSMContext):
         "Введите ID сигнала для удаления:",
         reply_markup=builder.as_markup()
     )
+    lock_state.acquire()
     await state.update_data(msg_id_for_del=msg.message_id)
     await state.set_state(Form.del_id)
+    lock_state.release()
 
 
 async def del_signal(message, id_signal):
@@ -302,7 +317,9 @@ async def del_signal(message, id_signal):
 
 @router.message(F.text, Form.del_id)
 async def form_del_id(message: types.Message, state: FSMContext):
+    lock_state.acquire()
     data = await state.get_data()
+    lock_state.release()
 
     await message.delete()
     await message.bot.delete_message(chat_id=message.from_user.id, message_id=data['msg_id_for_del'])

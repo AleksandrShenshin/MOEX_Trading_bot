@@ -2,10 +2,11 @@ import ast
 import asyncio
 from decouple import config
 from datetime import datetime, timedelta
+from threading import Lock
 import iss_moex.iss_moex as iss_moex
 
 USER_ID = None
-
+lock_state = Lock()
 
 async def set_user_id(user_id):
     global USER_ID
@@ -74,6 +75,7 @@ async def get_ticker_family(short_ticker):
 
 
 async def update_current_ticker(state):
+    global lock_state
     curr_instr = {}
     supp_instr = await get_support_instruments()
     for short_ticker in supp_instr:
@@ -83,7 +85,9 @@ async def update_current_ticker(state):
         ret_val['date_update'] = datetime.now().strftime("%Y-%m-%d")
         curr_instr[short_ticker] = ret_val
 
+    lock_state.acquire()
     await state.update_data(supp_tools=curr_instr)
+    lock_state.release()
     return 0, None
 
 

@@ -11,6 +11,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from general import moex_infinite_loop, set_user_id, update_current_ticker
+from general import lock_state
 from decouple import config
 import journal
 
@@ -27,7 +28,10 @@ dp = Dispatcher(storage=MemoryStorage())
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     stat_init = ''
+    lock_state.acquire()
     await state.clear()
+    lock_state.release()
+
     await set_user_id(message.from_user.id)
 
     ret_val, err_msg = await update_current_ticker(state)
@@ -39,7 +43,10 @@ async def cmd_start(message: types.Message, state: FSMContext):
         msg = await message.answer(stat_init)
 
     data = await journal.get_signals_from_file()
+    lock_state.acquire()
     await state.update_data(signals=data)
+    lock_state.release()
+
     stat_init = f"{stat_init}\n✅ Получение сигналов"
     await message.bot.edit_message_text(stat_init, chat_id=message.from_user.id, message_id=msg.message_id)
 
