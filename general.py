@@ -4,6 +4,7 @@ from decouple import config
 from datetime import datetime, timedelta
 from threading import Lock
 import iss_moex.iss_moex as iss_moex
+from aiogram.fsm.context import FSMContext
 
 USER_ID = None
 lock_state = Lock()
@@ -91,13 +92,18 @@ async def update_current_ticker(state):
     return 0, None
 
 
+async def task_upd_curr_ticker(state):
+    while True:
+        update_current_ticker(state)
+        # Run every 1 hour
+        await asyncio.sleep(1*60*60)
+
+
 # Define your infinite loop function
-async def moex_infinite_loop():
+async def moex_infinite_loop(state: FSMContext):
     global USER_ID
 
-    # TODO: добавить ежедневную задачу для обновления update_current_ticker
-    # проверить date_update в supp_tools, если не совпадает - обновить
-    # https://www.slingacademy.com/article/python-asyncio-run-a-task-at-a-certain-time-every-day/
+    asyncio.create_task(task_upd_curr_ticker(state))
 
     while True:
         if USER_ID is not None:

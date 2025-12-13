@@ -51,7 +51,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     await message.bot.edit_message_text(stat_init, chat_id=message.from_user.id, message_id=msg.message_id)
 
     # Start the infinite loop as a background task
-    asyncio.create_task(moex_infinite_loop())
+    asyncio.create_task(moex_infinite_loop(state))
 
     # Создаем объект билдера для Reply-клавиатуры
     builder = ReplyKeyboardBuilder()
