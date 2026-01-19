@@ -55,9 +55,15 @@ async def get_support_ticker(message: types.Message):
 
 @router.message(Command("get_signals"))
 @router.message(F.text.lower().contains('просмотр сигналов'))
-async def get_list_signal(message: types.Message):
-    # TODO: возможно нужно брать текущие сигналы из опращиваемой структуры
-    data = await journal.get_signals_from_file()
+async def get_list_signal(message: types.Message, state: FSMContext):
+    lock_state.acquire()
+    all_data = await state.get_data()
+    try:
+        data = all_data['signals']
+    except KeyError:
+        data = {}
+    lock_state.release()
+
     if len(data) != 0:
         msg_to_print = f"Активные сигналы:\n"
 
