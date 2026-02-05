@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from threading import Lock
-import iss_moex.iss_moex as iss_moex
+#import iss_moex.iss_moex as iss_moex           # TODO: debug bothost
 from aiogram.fsm.context import FSMContext
 
 USER_ID = None
@@ -45,34 +45,35 @@ async def get_precision_from_value(value):
 
 
 async def get_ticker_family(short_ticker):
-    DAYS_BEFORE_EXCHANGE = 4
-    ticker_family = {'all_list': '', 'current_ticker': '', 'precision': ''}
-    list_ticker = iss_moex.get_list_definite_futures(short_ticker)
-    ticker_family['all_list'] = list_ticker
-    for full_ticker in list_ticker:
-        try:
-            data_fut = iss_moex.get_data_future(full_ticker)
-            if len(data_fut) == 0:
-                continue
-
-            precision, err_val = await get_precision_from_value(data_fut['minstep'])
-            if precision == -1:
-                return -1, None, err_val
-            else:
-                ticker_family['precision'] = str(precision)
-
-            if len(ticker_family['current_ticker']) == 0:
-                if (datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d') - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):
-                    ticker_family['current_ticker'] = data_fut['ticker']
-                    date_in_current_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
-            else:
-                date_next_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
-                if date_next_ticker < date_in_current_ticker and (date_next_ticker - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):
-                    ticker_family['current_ticker'] = data_fut['ticker']
-                    date_in_current_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
-        except KeyError as e:
-            return -1, None, f"get_ticker_family(): KeyError: {e}"
-    return 0, ticker_family, ''
+    return -1, None, "TODO: debug bothost"                    # TODO: debug bothost
+#    DAYS_BEFORE_EXCHANGE = 4
+#    ticker_family = {'all_list': '', 'current_ticker': '', 'precision': ''}
+#    list_ticker = iss_moex.get_list_definite_futures(short_ticker)
+#    ticker_family['all_list'] = list_ticker
+#    for full_ticker in list_ticker:
+#        try:
+#            data_fut = iss_moex.get_data_future(full_ticker)
+#            if len(data_fut) == 0:
+#                continue
+#
+#            precision, err_val = await get_precision_from_value(data_fut['minstep'])
+#            if precision == -1:
+#                return -1, None, err_val
+#            else:
+#                ticker_family['precision'] = str(precision)
+#
+#            if len(ticker_family['current_ticker']) == 0:
+#                if (datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d') - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):
+#                    ticker_family['current_ticker'] = data_fut['ticker']
+#                    date_in_current_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
+#            else:
+#                date_next_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
+#                if date_next_ticker < date_in_current_ticker and (date_next_ticker - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):
+#                    ticker_family['current_ticker'] = data_fut['ticker']
+#                    date_in_current_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
+#        except KeyError as e:
+#            return -1, None, f"get_ticker_family(): KeyError: {e}"
+#    return 0, ticker_family, ''
 
 
 async def update_current_ticker(state):

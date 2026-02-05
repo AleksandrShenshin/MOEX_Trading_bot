@@ -1,5 +1,5 @@
 import journal
-import t_invest_lib.tinv as tinv
+#import t_invest_lib.tinv as tinv                       # TODO: debug bothost
 from aiogram import Router, types, F
 from aiogram.filters import CommandObject
 from aiogram.filters.command import Command
@@ -258,7 +258,9 @@ async def add_signal(message, state, ticker, type_signal, value):
         except IndexError:
             pass
 
-    status, figi, err_mess = await tinv.get_figi_instrument(ticker, 'SPBFUT')
+#    status, figi, err_mess = await tinv.get_figi_instrument(ticker, 'SPBFUT')  # TODO: debug bothost
+    status = 1                                                                  # TODO: debug bothost
+    err_mess = "TODO: debug bothost"                                                               # TODO: debug bothost
     if status:
         await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
     else:
@@ -289,18 +291,19 @@ async def set_console(message: types.Message, command: CommandObject, state: FSM
     ticker, param_signal, value = command_args.split()
 
     supp_signals = await get_support_signals()
-    for text_signal, param_val in supp_signals.items():
-        try:
-            if param_signal != param_val['param']:
-                continue
-        except KeyError as e:
-            await message.answer(f"❌ <b>ERROR:</b> set_console(): KeyError {e}")
-            break
-        else:
-            await add_signal(message, state, ticker, text_signal, value)
-            break
-    else:
-        await message.answer(f"❌ <b>ERROR:</b> параметр {param_signal} не корректный.")
+    await message.answer(f"❌ <b>ERROR:</b> set_console(): KeyError GGG")      # TODO: del
+#    for text_signal, param_val in supp_signals.items():
+#        try:
+#            if param_signal != param_val['param']:
+#                continue
+#        except KeyError as e:
+#            await message.answer(f"❌ <b>ERROR:</b> set_console(): KeyError {e}")
+#            break
+#        else:
+#            await add_signal(message, state, ticker, text_signal, value)
+#            break
+#    else:
+#        await message.answer(f"❌ <b>ERROR:</b> параметр {param_signal} не корректный.")
 
 
 @router.message(F.text.lower().contains('удалить сигнал'))
