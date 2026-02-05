@@ -1,6 +1,4 @@
-import ast
 import asyncio
-from decouple import config
 from datetime import datetime, timedelta
 from threading import Lock
 import iss_moex.iss_moex as iss_moex
@@ -15,12 +13,14 @@ async def set_user_id(user_id):
 
 
 async def get_support_instruments():
-    return config('FUTURES_LIST', cast=lambda v: [s.strip() for s in v.split(',')])
+    FUTURES_LIST = ['si', 'cr']
+    return FUTURES_LIST
 
 
 async def get_support_signals():
+    TYPES_SIGNAL = {'Price': {'param': '-p'}, 'Volume': {'param': '-v'}}
     try:
-        return ast.literal_eval(config('TYPES_SIGNAL'))
+        return TYPES_SIGNAL
     except (SyntaxError, ValueError) as e:
         return None
 

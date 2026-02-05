@@ -12,11 +12,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from general import moex_infinite_loop, set_user_id, update_current_ticker
 from general import lock_state
-from decouple import config
 import journal
 
 # Объект бота
-bot = Bot(token=config('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(token=os.getenv('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Диспетчер
 dp = Dispatcher(storage=MemoryStorage())
