@@ -1,3 +1,6 @@
 [submodule "iss_moex"]
 	path = iss_moex
 	url = git@github.com:AleksandrShenshin/iss_moex.git
+[submodule "t_invest_lib"]
+	path = t_invest_lib
+	url = git@github.com:AleksandrShenshin/t_invest_lib.git
