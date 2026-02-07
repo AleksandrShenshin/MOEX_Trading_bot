@@ -1,0 +1,3 @@
+[submodule "iss_moex"]
+	path = iss_moex
+	url = git@github.com:AleksandrShenshin/iss_moex.git
