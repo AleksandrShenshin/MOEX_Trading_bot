@@ -323,11 +323,15 @@ async def cmd_del_signal(message: types.Message, state: FSMContext):
     lock_state.release()
 
 
-async def del_signal(message, id_signal):
+async def del_signal(message, state, id_signal):
     ret_val, err_mess = await journal.del_signal_from_file(id_signal)
     if ret_val:
         await message.answer(f"❌ <b>ERROR:</b> удаления сигнала: {err_mess}")
     else:
+        data = await journal.get_signals_from_file()
+        lock_state.acquire()
+        await state.update_data(signals=data)
+        lock_state.release()
         await message.answer(f"❎ <b>OK:</b> сигнал id={id_signal} успешно удалён.")
 
 
@@ -340,12 +344,12 @@ async def form_del_id(message: types.Message, state: FSMContext):
     await message.delete()
     await message.bot.delete_message(chat_id=message.from_user.id, message_id=data['msg_id_for_del'])
 
-    await del_signal(message, message.text)
+    await del_signal(message, state, message.text)
     await state_clear_soft(state)
 
 
 @router.message(Command("del"))
-async def del_console(message: types.Message, command: CommandObject):
+async def del_console(message: types.Message, command: CommandObject, state: FSMContext):
     id_signal: str = command.args
     try:
         int(id_signal)
@@ -353,7 +357,7 @@ async def del_console(message: types.Message, command: CommandObject):
         await message.answer(f"❌ <b>ERROR:</b> значение id_signal должно быть целым.")
         return
 
-    await del_signal(message, id_signal)
+    await del_signal(message, state, id_signal)
 
 
 # Хэндлер на остальные текстовые сообщения
