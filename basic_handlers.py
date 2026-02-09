@@ -264,6 +264,10 @@ async def add_signal(message, state, ticker, type_signal, value):
     else:
         ret_val, err_mess = await journal.set_signal_to_file(ticker, type_signal.lower(), value, figi)
         if not ret_val:
+            data = await journal.get_signals_from_file()
+            lock_state.acquire()
+            await state.update_data(signals=data)
+            lock_state.release()
             await message.answer(f"📝 ✅ <b>set {ticker} {type_signal.lower()} {value}</b>")
         else:
             await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
