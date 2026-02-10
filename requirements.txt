@@ -1,4 +1,5 @@
 aiogram==3.22.0
 python-decouple==3.8
 requests==2.32.5
-t-tech-investments --index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple
+t-tech-investments
+--index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple
