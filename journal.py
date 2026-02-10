@@ -1,4 +1,5 @@
 import json
+import random
 import asyncio
 
 file_signals = "signals.json"
@@ -26,10 +27,22 @@ async def set_signal_to_file(ticker, type_signal, value, figi):
             except ValueError:
                 return 1, f"Ошибка структуры {file_signals}"
         else:
-            id = i
+            new_id = i
             break
 
-    signals[str(id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value, 'figi': figi}
+    # Назначение уникального Unique Identifier сигналу
+    while True:
+        unique_id = random.randint(1000, 9999)
+        for id, param_signal in signals.items():
+            try:
+                if param_signal['unique_id'] == str(unique_id):
+                    break
+            except KeyError:
+                return 1, f"Ошибка структуры {file_signals} -- отсутсвует 'unique_id'"
+        else:
+            break
+
+    signals[str(new_id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value, 'figi': figi, 'unique_id': unique_id}
 
     with open(file_signals, "w", encoding="utf-8") as f:
         json.dump(signals, f, indent=4, sort_keys=True, ensure_ascii=False)
