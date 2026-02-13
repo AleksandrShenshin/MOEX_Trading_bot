@@ -111,14 +111,41 @@ async def task_upd_curr_ticker(state):
         await asyncio.sleep(1*60*60)
 
 
+async def fetch_data(id):
+    while True:
+        print(f"***** Run work Task {id}", flush=True)
+        await asyncio.sleep(id) # Имитация сетевого запроса
+
+
 # Define your infinite loop function
 async def moex_infinite_loop(state: FSMContext):
     global USER_ID
+    curr_tasks = {}
 
     asyncio.create_task(task_upd_curr_ticker(state))
 
+    # TODO: Что будет если идет опрос тикера которого больше нет
     while True:
         if USER_ID is not None:
-            print("Infinite loop is running...", flush=True)
             # Add your desired logic here
+            lock_state.acquire()
+            data = await state.get_data()
+            lock_state.release()
+
+            list_unique_id = []
+
+            # В случае появления нового сигнала - создаём для него задачу
+            for param_signal in data['signals'].values():
+                list_unique_id.append(param_signal['unique_id'])
+                if param_signal['unique_id'] not in curr_tasks:
+                    task = asyncio.create_task(fetch_data(len(curr_tasks)+1))
+                    curr_tasks[param_signal['unique_id']] = task
+
+            # В случае удаления сигнала - удаляем задачу
+            for unique_id in list(curr_tasks.keys()):
+                if unique_id not in list_unique_id:
+                    task = curr_tasks[unique_id]
+                    task.cancel()
+                    curr_tasks.pop(unique_id, None)
+
         await asyncio.sleep(5)  # Sleep for 5 seconds to avoid busy-waiting
