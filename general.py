@@ -114,7 +114,7 @@ async def task_upd_curr_ticker(state):
 async def fetch_data(id):
     while True:
         print(f"***** Run work Task {id}", flush=True)
-        await asyncio.sleep(id) # Имитация сетевого запроса
+        await asyncio.sleep(3) # Имитация сетевого запроса
 
 
 # Define your infinite loop function
@@ -130,21 +130,33 @@ async def moex_infinite_loop(state: FSMContext):
             # Add your desired logic here
             lock_state.acquire()
             data = await state.get_data()
+            bot = data['bot']
+            debug_param = data['debug']
+            await state.update_data(debug=None)
             lock_state.release()
+
+            if debug_param == "get_tasks":
+                msg_to_print = f"🍳 <b>Список опрашеваемых ID сигналов:</b>\n"
+                for param_curr_tasks in curr_tasks.values():
+                    msg_to_print += f"{param_curr_tasks['id']}\n"
+                await bot.send_message(USER_ID, msg_to_print)
 
             list_unique_id = []
 
             # В случае появления нового сигнала - создаём для него задачу
-            for param_signal in data['signals'].values():
+            for id_signal, param_signal in data['signals'].items():
                 list_unique_id.append(param_signal['unique_id'])
                 if param_signal['unique_id'] not in curr_tasks:
-                    task = asyncio.create_task(fetch_data(len(curr_tasks)+1))
-                    curr_tasks[param_signal['unique_id']] = task
+                    curr_param_task = {}
+                    task = asyncio.create_task(fetch_data(id_signal))
+                    curr_param_task['id'] = id_signal
+                    curr_param_task['task'] = task
+                    curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
 
             # В случае удаления сигнала - удаляем задачу
             for unique_id in list(curr_tasks.keys()):
                 if unique_id not in list_unique_id:
-                    task = curr_tasks[unique_id]
+                    task = curr_tasks[unique_id]['task']
                     task.cancel()
                     curr_tasks.pop(unique_id, None)
 

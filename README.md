@@ -18,7 +18,6 @@ _param_ - -p - price, -v - volume
 > [!WARNING]
 > Для работы необходимо в директорию проекта установить следующие пакеты:  
 > `pip install -r requirements.txt`  
-> `git clone git@github.com:AleksandrShenshin/iss_moex.git`  
 
 ## Примеры команд из строки
 >>>>>
@@ -29,4 +28,7 @@ _param_ - -p - price, -v - volume
 <b>TICKER</b>: сокращенный (si, cr), полный (siz5)  
 <b>TYPE_SIGNAL</b>: -p - price, -v - volume  
 <b>VALUE</b>: значение целое или дробное  
+/debug <b>PARAM</b>  
+<b>PARAM</b> может принимать следующие значения:  
+<b>get_tasks</b> - получить id опрашиваемых сигналов  
 <<<<<

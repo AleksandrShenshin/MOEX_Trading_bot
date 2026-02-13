@@ -31,6 +31,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     lock_state.acquire()
     await state.clear()
     await state.update_data(bot=bot)
+    await state.update_data(debug=None)
     lock_state.release()
 
     await set_user_id(message.from_user.id)

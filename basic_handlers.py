@@ -109,9 +109,15 @@ async def state_clear_soft(state):
     except KeyError:
         bot = None
 
+    try:
+        debug = data['debug']
+    except KeyError:
+        debug = None
+
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
     await state.update_data(signals=signals)
+    await state.update_data(debug=debug)
     await state.update_data(bot=bot)
     lock_state.release()
 
@@ -358,6 +364,18 @@ async def del_console(message: types.Message, command: CommandObject, state: FSM
         return
 
     await del_signal(message, state, id_signal)
+
+
+@router.message(Command("debug"))
+async def debug_console(message: types.Message, command: CommandObject, state: FSMContext):
+    debug_param: str = command.args
+    if debug_param == "get_tasks":
+        lock_state.acquire()
+        await state.update_data(debug="get_tasks")
+        lock_state.release()
+    else:
+        await message.answer(f"❌ <b>ERROR:</b> значение {debug_param} не корректно.")
+        return
 
 
 # Хэндлер на остальные текстовые сообщения
