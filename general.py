@@ -46,7 +46,7 @@ async def get_precision_from_value(value):
 
 async def get_ticker_family(short_ticker):
     DAYS_BEFORE_EXCHANGE = 4
-    ticker_family = {'all_list': '', 'current_ticker': '', 'precision': ''}
+    ticker_family = {'all_list': '', 'current_ticker': ''}
     list_ticker = iss_moex.get_list_definite_futures(short_ticker)
     ticker_family['all_list'] = list_ticker
     for full_ticker in list_ticker:
@@ -54,12 +54,6 @@ async def get_ticker_family(short_ticker):
             data_fut = iss_moex.get_data_future(full_ticker)
             if len(data_fut) == 0:
                 continue
-
-            precision, err_val = await get_precision_from_value(data_fut['minstep'])
-            if precision == -1:
-                return -1, None, err_val
-            else:
-                ticker_family['precision'] = str(precision)
 
             if len(ticker_family['current_ticker']) == 0:
                 if (datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d') - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):

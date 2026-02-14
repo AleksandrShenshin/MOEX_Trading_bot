@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from general import get_support_instruments, get_support_signals
+from general import get_support_instruments, get_support_signals, get_precision_from_value
 from general import lock_state
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
@@ -212,19 +212,14 @@ async def add_signal(message, state, ticker, type_signal, value):
                 for element in param_family['all_list']:
                     if ticker.lower() == element.lower():
                         ticker = element
-                        precision = int(param_family['precision'])
                         break
                 else:
                     await message.answer(f"❌ <b>ERROR:</b> add_signal(): тикер {ticker} не поддерживается!")
                     return
                 break
-        else:
-            await message.answer(f"❌ <b>ERROR:</b> add_signal(): тикер {ticker} не поддерживается!")
-            return
     except KeyError as e:
         await message.answer(f"❌ <b>ERROR:</b> add_signal(): get 'supp_tools' except KeyError {e}")
         return
-
 
     supp_signals = await get_support_signals()
     for text_signal, param_signal in supp_signals.items():
@@ -248,35 +243,45 @@ async def add_signal(message, state, ticker, type_signal, value):
             await message.answer(f"❌ <b>ERROR:</b> значение {value} должно содержать только цифры")
             return
 
-    if precision == 0:
-        if '.' in value:
-            if int(value.split('.')[1]) > 0:
-                await message.answer(f"❌ <b>ERROR:</b> значение {value} не должно содержать дробной части")
-                return
-            else:
-                value = value.split('.')[0]
-    else:
-        try:
-            if len(value.split('.')[1]) > precision:
-                await message.answer(f"❌ <b>ERROR:</b> значение дробной части {value} не должно содержать "
-                                     f"количество знаков > {precision}")
-                return
-        except IndexError:
-            pass
-
-    status, figi, err_mess = await tinv.get_figi_instrument(ticker, 'SPBFUT')
+    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
     if status:
         await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
-    else:
-        ret_val, err_mess = await journal.set_signal_to_file(ticker, type_signal.lower(), value, figi)
+        return
+
+    try:
+        precision, err_val = await get_precision_from_value(ticker_param['precision'])
+        if precision == -1:
+            await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: get_precision_from_value(): {err_val}")
+            return
+
+        if precision == 0:
+            if '.' in value:
+                if int(value.split('.')[1]) > 0:
+                    await message.answer(f"❌ <b>ERROR:</b> значение {value} не должно содержать дробной части")
+                    return
+                else:
+                    value = value.split('.')[0]
+        else:
+            try:
+                if len(value.split('.')[1]) > precision:
+                    await message.answer(f"❌ <b>ERROR:</b> значение дробной части {value} не должно содержать "
+                                         f"количество знаков > {precision}")
+                    return
+            except IndexError:
+                pass
+
+        ret_val, err_mess = await journal.set_signal_to_file(ticker_param['ticker'], type_signal.lower(), value, ticker_param['figi'])
         if not ret_val:
             data = await journal.get_signals_from_file()
             lock_state.acquire()
             await state.update_data(signals=data)
             lock_state.release()
-            await message.answer(f"📝 ✅ <b>set {ticker} {type_signal.lower()} {value}</b>")
+            await message.answer(f"📝 ✅ <b>set {ticker_param['ticker']} {type_signal.lower()} {value}</b>")
         else:
             await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
+    except KeyError as e:
+        await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: KeyError: {e}")
+        return
 
 
 @router.message(F.text, Form.value)
