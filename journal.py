@@ -1,6 +1,5 @@
 import json
 import random
-import asyncio
 
 file_signals = "signals.json"
 
