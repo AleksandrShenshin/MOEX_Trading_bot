@@ -21,13 +21,14 @@ _param_ - -p - price, -v - volume
 
 ## Примеры команд из строки
 >>>>>
-/get_list_ticker - поддерживаемые тикеры  
 /get_signals - список установленных сигналов  
 /del <b>id_signal</b> - удалить сигнал по его ID  
 /set <b>TICKER</b> <b>TYPE_SIGNAL</b> <b>VALUE</b>  
 <b>TICKER</b>: сокращенный (si, cr), полный (siz5)  
 <b>TYPE_SIGNAL</b>: -p - price, -v - volume  
 <b>VALUE</b>: значение целое или дробное  
+/long5 forts/moex on/off  
+/get_list_ticker - поддерживаемые тикеры  
 /debug <b>PARAM</b>  
 <b>PARAM</b> может принимать следующие значения:  
 <b>get_tasks</b> - получить id опрашиваемых сигналов  

@@ -391,6 +391,22 @@ async def debug_console(message: types.Message, command: CommandObject, state: F
         return
 
 
+@router.message(Command("long5"))
+async def long5_console(message: types.Message, command: CommandObject, state: FSMContext):
+    command_args = (command.args or "").strip()
+    if not command_args or len(command_args.split()) != 2:
+        await message.answer(f"❌ Использование: <b>/long5 forts/moex on/off</b>")
+        return
+
+    market, mode = command_args.split()
+
+    if market not in ['forts', 'moex'] or mode not in ['on', 'off']:
+        await message.answer(f"❌ Использование: <b>/long5 forts/moex on/off</b>")
+        return
+
+#    await add_signal(message, state, ticker, text_signal, value)
+
+
 # Хэндлер на остальные текстовые сообщения
 @router.message()
 async def unknown_message(message: types.Message):
