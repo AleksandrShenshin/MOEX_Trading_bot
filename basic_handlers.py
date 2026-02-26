@@ -300,7 +300,11 @@ async def form_state(message: types.Message, state: FSMContext):
 
 @router.message(Command("set"))
 async def set_console(message: types.Message, command: CommandObject, state: FSMContext):
-    command_args: str = command.args
+    command_args = (command.args or "").strip()
+    if not command_args or len(command_args.split()) != 3:
+        await message.answer(f"❌ Использование: <b>/set TICKER TYPE_SIGNAL VALUE</b>")
+        return
+
     ticker, param_signal, value = command_args.split()
 
     supp_signals = await get_support_signals()
@@ -364,8 +368,8 @@ async def del_console(message: types.Message, command: CommandObject, state: FSM
     id_signal: str = command.args
     try:
         int(id_signal)
-    except ValueError:
-        await message.answer(f"❌ <b>ERROR:</b> значение id_signal должно быть целым.")
+    except (ValueError, TypeError):
+        await message.answer(f"❌ <b>ERROR:</b> укажите значение id_signal (должно быть целым).")
         return
 
     await del_signal(message, state, id_signal)
@@ -373,13 +377,17 @@ async def del_console(message: types.Message, command: CommandObject, state: FSM
 
 @router.message(Command("debug"))
 async def debug_console(message: types.Message, command: CommandObject, state: FSMContext):
-    debug_param: str = command.args
-    if debug_param == "get_tasks":
+    command_args = (command.args or "").strip()
+    if not command_args or len(command_args.split()) != 1:
+        await message.answer(f"❌ Использование: <b>/debug PARAM</b>")
+        return
+
+    if command_args == "get_tasks":
         lock_state.acquire()
         await state.update_data(debug="get_tasks")
         lock_state.release()
     else:
-        await message.answer(f"❌ <b>ERROR:</b> значение {debug_param} не корректно.")
+        await message.answer(f"❌ <b>ERROR:</b> значение {command_args} не корректно.")
         return
 
 
