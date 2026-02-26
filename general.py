@@ -1,13 +1,17 @@
 import ast
 import asyncio
+import journal
 from decouple import config
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from threading import Lock
+import t_invest_lib.tinv as tinv
 import iss_moex.iss_moex as iss_moex
 from aiogram.fsm.context import FSMContext
 
 USER_ID = None
+shared_tasks = {}
 lock_state = Lock()
+lock_data_tasks = asyncio.Lock()
 
 async def set_user_id(user_id):
     global USER_ID
@@ -105,15 +109,70 @@ async def task_upd_curr_ticker(state):
         await asyncio.sleep(1*60*60)
 
 
-async def fetch_data(id):
-    while True:
-        print(f"***** Run work Task {id}", flush=True)
-        await asyncio.sleep(3) # Имитация сетевого запроса
+async def fetch_data(lock, shared_tasks, param_signal, bot, user_id):
+    fl_run_stream = False
+    try:
+        async with lock:
+            if param_signal['ticker'] not in list(shared_tasks.keys()):
+                new_task_sign = {'figi': param_signal['figi'], 'high': None, 'low': None, 'volume': None,
+                                 'time_received': None, 'depends': None}
+                new_task_sign['depends'] = set()
+                shared_tasks[param_signal['ticker']] = new_task_sign.copy()
+                fl_run_stream = True
+            shared_tasks[param_signal['ticker']]['depends'].add(asyncio.current_task())
+        if fl_run_stream:
+            asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
+
+        time_send_msg = datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc)
+        while True:
+            async with lock:
+                candle_high = shared_tasks[param_signal['ticker']]['high']
+                candle_low = shared_tasks[param_signal['ticker']]['low']
+                candle_volume = shared_tasks[param_signal['ticker']]['volume']
+                candle_time_received = shared_tasks[param_signal['ticker']]['time_received']
+                # TODO: если time_received не обновляется в течении 3 мин, то что-то сломалось в tinv
+
+            if candle_high == None or candle_low == None or candle_volume == None:
+                await asyncio.sleep(3)
+                continue
+
+            if param_signal['type_signal'] == 'volume':
+                if int(candle_volume) >= int(param_signal['value']):
+                    if ((candle_time_received - time_send_msg) > timedelta(minutes=1)) or \
+                        (candle_time_received.minute != time_send_msg.minute):
+                        time_send_msg = candle_time_received
+                        msg_to_print = f"🤖 {param_signal['ticker']} {param_signal['type_signal']} {candle_volume} >= {param_signal['value']}"
+                        await bot.send_message(user_id, msg_to_print)
+            elif param_signal['type_signal'] == 'price':
+                msg_to_print = ""
+
+                if candle_high >= float(param_signal['value']) and candle_low <= float(param_signal['value']):
+                    msg_to_print = f"📈 {param_signal['ticker']} {param_signal['type_signal']} {candle_high} &gt;= {param_signal['value']}"    # > заменён на &gt; согласно HTML-разметке
+                elif candle_low <= float(param_signal['value']) and candle_high >= float(param_signal['value']):
+                    msg_to_print = f"📉 {param_signal['ticker']} {param_signal['type_signal']} {candle_low} &lt;= {param_signal['value']}"    # < заменён на &lt; согласно HTML-разметке
+
+                if msg_to_print:
+                    # TODO: значение price выводить в соответствии с точностью инструмента
+                    await bot.send_message(user_id, msg_to_print)
+                    break
+
+            await asyncio.sleep(2)
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        print(f"fetch_data(): ERROR: {type(e).__name__}: {e}", flush=True)
+        await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> удалён сигнал: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
+    finally:
+        async with lock:
+            shared_tasks[param_signal['ticker']]['depends'].discard(asyncio.current_task())
 
 
 # Define your infinite loop function
 async def moex_infinite_loop(state: FSMContext):
     global USER_ID
+    global shared_tasks
+    global lock_state
+    global lock_data_tasks
     curr_tasks = {}
 
     asyncio.create_task(task_upd_curr_ticker(state))
@@ -142,7 +201,7 @@ async def moex_infinite_loop(state: FSMContext):
                 list_unique_id.append(param_signal['unique_id'])
                 if param_signal['unique_id'] not in curr_tasks:
                     curr_param_task = {}
-                    task = asyncio.create_task(fetch_data(id_signal))
+                    task = asyncio.create_task(fetch_data(lock_data_tasks, shared_tasks, param_signal, bot, USER_ID))
                     curr_param_task['id'] = id_signal
                     curr_param_task['task'] = task
                     curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
