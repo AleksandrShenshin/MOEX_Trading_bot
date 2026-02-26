@@ -147,11 +147,24 @@ async def moex_infinite_loop(state: FSMContext):
                     curr_param_task['task'] = task
                     curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
 
-            # В случае удаления сигнала - удаляем задачу
             for unique_id in list(curr_tasks.keys()):
                 if unique_id not in list_unique_id:
+                    # В случае удаления сигнала - удаляем задачу
                     task = curr_tasks[unique_id]['task']
                     task.cancel()
                     curr_tasks.pop(unique_id, None)
+                else:
+                    # В случае завершения задачи - удаляем сигнал
+                    task = curr_tasks[unique_id]['task']
+                    if task.done():
+                        done_task = curr_tasks.pop(unique_id, None)
+                        ret_val, err_mess = await journal.del_signal_from_file(done_task['id'])
+                        if ret_val:
+                            await bot.send_message(USER_ID, f"❌ <b>ERROR:</b> удаления сигнала: {err_mess}")
+                        else:
+                            data = await journal.get_signals_from_file()
+                            lock_state.acquire()
+                            await state.update_data(signals=data)
+                            lock_state.release()
 
         await asyncio.sleep(5)  # Sleep for 5 seconds to avoid busy-waiting
