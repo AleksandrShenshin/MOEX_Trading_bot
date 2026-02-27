@@ -75,7 +75,7 @@ async def get_list_signal(message: types.Message, state: FSMContext):
             list_signals.append(curr_signal)
 
         # Сортировка по value
-        list_signals = sorted(list_signals, key=lambda d: d['value'])
+        list_signals = sorted(list_signals, key=lambda d: d['value'], reverse=True)
         # Сортировка по type_signal
         list_signals = sorted(list_signals, key=lambda d: d['type_signal'])
         # Сортировка по ticker
