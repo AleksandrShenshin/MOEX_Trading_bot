@@ -1,4 +1,5 @@
 import ast
+import copy
 import asyncio
 import journal
 from decouple import config
@@ -10,8 +11,10 @@ from aiogram.fsm.context import FSMContext
 
 USER_ID = None
 shared_tasks = {}
+data_tasks_long5 = {}
 lock_state = Lock()
 lock_data_tasks = asyncio.Lock()
+lock_data_long5 = asyncio.Lock()
 
 async def set_user_id(user_id):
     global USER_ID
@@ -109,7 +112,7 @@ async def task_upd_curr_ticker(state):
         await asyncio.sleep(1*60*60)
 
 
-async def fetch_data(lock, shared_tasks, param_signal, bot, user_id):
+async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, user_id):
     fl_run_stream = False
     try:
         async with lock:
@@ -160,19 +163,85 @@ async def fetch_data(lock, shared_tasks, param_signal, bot, user_id):
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        print(f"fetch_data(): ERROR: {type(e).__name__}: {e}", flush=True)
+        print(f"fetch_data_ticker(): ERROR: {type(e).__name__}: {e}", flush=True)
         await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> удалён сигнал: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
     finally:
         async with lock:
             shared_tasks[param_signal['ticker']]['depends'].discard(asyncio.current_task())
 
 
+async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, user_id):
+    # data_tasks_long5 = {'forts': {},
+    #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'ticker': '', 'prev_bin': -1,
+    #                                                 'cur_atr': {'high': None, 'low': None, 'time_received': None}},
+    #                                          figi: {}},
+    #                              'depends': None}
+
+    coefficient_multiplication_atr = 2.5
+    try:
+        if market == 'forts':
+            list_tickers = config('LONG_FIVE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+            # TODO: получить текущие тикеры
+        elif market == 'moex':
+            # ['SBER', 'VTBR', 'GAZP', 'GMKN']
+            list_tickers = config('LONG_FIVE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+
+        async with lock_data_long5:
+            if market not in list(data_tasks_long5.keys()):
+                data_tasks_long5[market] = {'tickers': {}, 'depends': set()}
+                data_tasks_long5[market]['depends'].add(asyncio.current_task())
+                for ticker in list_tickers:
+                    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
+                    if status:
+                        await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> long5 {market} получение параметров {ticker}: {err_mess}")
+                        return
+                    else:
+                        data_tasks_long5[market]['tickers'][ticker_param['figi']] = {'atr': [],
+                                                                                     'ticker': ticker_param['ticker'],
+                                                                                     'prev_bin': -1,
+                                                                                     'cur_atr': {'high': None,
+                                                                                                 'low': None,
+                                                                                                 'time_received': None}
+                                                                                     }
+                asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
+
+        time_send_msg = datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc)
+        prev_bin = -1
+        while True:
+            async with lock_data_long5:
+                upd_data_long5 = copy.deepcopy(data_tasks_long5[market]['tickers'])
+            # TODO: если time_received не обновляется в течении 15 мин, то что-то сломалось в tinv
+            for figi, ticker_param in upd_data_long5.items():
+                if len(ticker_param['atr']) < 5:
+                    continue
+                else:
+                    average = sum(ticker_param['atr']) / len(ticker_param['atr'])
+                    if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average * coefficient_multiplication_atr):
+                        if ((ticker_param['cur_atr']['time_received'] - time_send_msg) > timedelta(minutes=5)) or \
+                            ((ticker_param['cur_atr']['time_received'].minute // 5) != prev_bin): # Проверка перехода между 5 мин
+                            time_send_msg = ticker_param['cur_atr']['time_received']
+                            prev_bin = (ticker_param['cur_atr']['time_received'].minute // 5)
+                            msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
+                            await bot.send_message(user_id, msg_to_print)
+            await asyncio.sleep(2)
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        print(f"fetch_data_long5(): ERROR: {type(e).__name__}: {e}", flush=True)
+        await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> удалён сигнал: long5 {market}")
+    finally:
+        async with lock_data_long5:
+            data_tasks_long5[market]['depends'].discard(asyncio.current_task())
+
+
 # Define your infinite loop function
 async def moex_infinite_loop(state: FSMContext):
     global USER_ID
     global shared_tasks
+    global data_tasks_long5
     global lock_state
     global lock_data_tasks
+    global lock_data_long5
     curr_tasks = {}
 
     asyncio.create_task(task_upd_curr_ticker(state))
@@ -201,7 +270,10 @@ async def moex_infinite_loop(state: FSMContext):
                 list_unique_id.append(param_signal['unique_id'])
                 if param_signal['unique_id'] not in curr_tasks:
                     curr_param_task = {}
-                    task = asyncio.create_task(fetch_data(lock_data_tasks, shared_tasks, param_signal, bot, USER_ID))
+                    if param_signal['type_signal'] == 'price' or param_signal['type_signal'] == 'volume':
+                        task = asyncio.create_task(fetch_data_ticker(lock_data_tasks, shared_tasks, param_signal, bot, USER_ID))
+                    elif param_signal['type_signal'] == 'long5':
+                        task = asyncio.create_task(fetch_data_long5(lock_data_long5, data_tasks_long5, param_signal['market'], bot, USER_ID))
                     curr_param_task['id'] = id_signal
                     curr_param_task['task'] = task
                     curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
