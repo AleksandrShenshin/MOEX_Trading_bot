@@ -41,7 +41,10 @@ async def set_signal_to_file(ticker, type_signal, value, figi):
         else:
             break
 
-    signals[str(new_id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value, 'figi': figi, 'unique_id': unique_id}
+    if type_signal.lower() == 'long5':
+        signals[str(new_id)] = {'type_signal': type_signal, 'market': ticker, 'unique_id': unique_id}
+    else:
+        signals[str(new_id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value, 'figi': figi, 'unique_id': unique_id}
 
     with open(file_signals, "w", encoding="utf-8") as f:
         json.dump(signals, f, indent=4, sort_keys=True, ensure_ascii=False)

@@ -69,6 +69,8 @@ async def get_list_signal(message: types.Message, state: FSMContext):
 
         list_signals = []
         for key, value in data.items():
+            if value['type_signal'].lower() == 'long5':
+                continue
             curr_signal = value.copy()
             curr_signal['id'] = key
             curr_signal['value'] = float(value['value'])
@@ -84,6 +86,9 @@ async def get_list_signal(message: types.Message, state: FSMContext):
         try:
             for signal in list_signals:
                 msg_to_print += f"{signal['id']}: {signal['ticker']} {signal['type_signal']} {data[signal['id']]['value']}\n"
+            for key, value in data.items():
+                if value['type_signal'].lower() == 'long5':
+                    msg_to_print += f"{key}: {value['type_signal']} {value['market']}\n"
             await message.answer(msg_to_print)
         except KeyError:
             await message.answer("❌ <b>ОШИБКА:</b> получения данных")
@@ -153,21 +158,36 @@ async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContex
     data = await state.get_data()
     lock_state.release()
 
-    for short_ticker, val_short_ticker in data['supp_tools'].items():
-        text_ticker = val_short_ticker['current_ticker']
-        builder.row(
-            InlineKeyboardButton(
-                text=text_ticker,
-                callback_data=f'ticker_{text_ticker}'
+    if type_signal == 'long5':
+        for market in ['forts', 'moex']:
+            builder.row(
+                InlineKeyboardButton(
+                    text=market,
+                    callback_data=f'ticker_{market}'
+                )
             )
-        )
+    else:
+        for short_ticker, val_short_ticker in data['supp_tools'].items():
+            text_ticker = val_short_ticker['current_ticker']
+            builder.row(
+                InlineKeyboardButton(
+                    text=text_ticker,
+                    callback_data=f'ticker_{text_ticker}'
+                )
+            )
     builder.adjust(3)
 
     # Редактируем текст исходного сообщения
-    await callback.message.edit_text(
-        "Выберите инструмент:",
-        reply_markup=builder.as_markup()
-    )
+    if type_signal == 'long5':
+        await callback.message.edit_text(
+            "Выберите рынок:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            "Выберите инструмент:",
+            reply_markup=builder.as_markup()
+        )
     # Отвечаем на callback, чтобы убрать "часики" на кнопке
     await callback.answer()
 
@@ -176,22 +196,40 @@ async def handle_set_type_signal(callback: types.CallbackQuery, state: FSMContex
 async def handle_set_ticker(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     ticker = callback.data.split("_")[1]
-    lock_state.acquire()
-    await state.update_data(ticker=ticker)
-    await state.update_data(msg_id_for_del=callback.message.message_id)
-    data = await state.get_data()
-    lock_state.release()
 
-    builder.button(text="Отмена", callback_data=f"cancel_signal")
+    if ticker in ['forts', 'moex']:
+        await callback.message.delete()
 
-    # Редактируем текст исходного сообщения
-    await callback.message.edit_text(
-        f"Введите значение <b>{data['ticker']}</b> <b>{data['type_signal']:}</b>",
-        reply_markup=builder.as_markup()
-    )
-    lock_state.acquire()
-    await state.set_state(Form.value)
-    lock_state.release()
+        lock_state.acquire()
+        all_data = await state.get_data()
+        lock_state.release()
+        await state_clear_soft(state)
+        try:
+            for key, value in all_data['signals'].items():
+                if value['type_signal'].lower() == 'long5' and value['market'] == ticker:
+                    await callback.message.answer(f"📝 ✅ <b>{value['type_signal'].lower()} {value['market']}</b> уже установлен!")
+                    return
+        except KeyError:
+            await callback.message.answer(f"❌ <b>ERROR:</b> handle_set_ticker(): format state")
+        else:
+            await add_signal(callback.message, state, ticker, "long5", None)
+    else:
+        lock_state.acquire()
+        await state.update_data(ticker=ticker)
+        await state.update_data(msg_id_for_del=callback.message.message_id)
+        data = await state.get_data()
+        lock_state.release()
+
+        builder.button(text="Отмена", callback_data=f"cancel_signal")
+
+        # Редактируем текст исходного сообщения
+        await callback.message.edit_text(
+            f"Введите значение <b>{data['ticker']}</b> <b>{data['type_signal']:}</b>",
+            reply_markup=builder.as_markup()
+        )
+        lock_state.acquire()
+        await state.set_state(Form.value)
+        lock_state.release()
 
 
 @router.callback_query(F.data == "cancel_signal")
@@ -201,26 +239,6 @@ async def handle_cancel_signal(callback: types.CallbackQuery, state: FSMContext)
 
 
 async def add_signal(message, state, ticker, type_signal, value):
-    try:
-        lock_state.acquire()
-        support_tools = await state.get_data()
-        lock_state.release()
-        for short_ticker, param_family in support_tools['supp_tools'].items():
-            if short_ticker == ticker.lower()[0:2]:
-                if len(ticker) == 2:
-                    ticker = param_family['current_ticker']
-                for element in param_family['all_list']:
-                    if ticker.lower() == element.lower():
-                        ticker = element
-                        break
-                else:
-                    await message.answer(f"❌ <b>ERROR:</b> add_signal(): тикер {ticker} не поддерживается!")
-                    return
-                break
-    except KeyError as e:
-        await message.answer(f"❌ <b>ERROR:</b> add_signal(): get 'supp_tools' except KeyError {e}")
-        return
-
     supp_signals = await get_support_signals()
     for text_signal, param_signal in supp_signals.items():
         if text_signal.lower() == type_signal.lower():
@@ -243,45 +261,74 @@ async def add_signal(message, state, ticker, type_signal, value):
             await message.answer(f"❌ <b>ERROR:</b> значение {value} должно содержать только цифры")
             return
 
-    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
-    if status:
-        await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
-        return
-
-    try:
-        precision, err_val = await get_precision_from_value(ticker_param['precision'])
-        if precision == -1:
-            await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: get_precision_from_value(): {err_val}")
+    if type_signal.lower() == 'long5':
+        figi = None
+    else:
+        try:
+            lock_state.acquire()
+            support_tools = await state.get_data()
+            lock_state.release()
+            for short_ticker, param_family in support_tools['supp_tools'].items():
+                if short_ticker == ticker.lower()[0:2]:
+                    if len(ticker) == 2:
+                        ticker = param_family['current_ticker']
+                    for element in param_family['all_list']:
+                        if ticker.lower() == element.lower():
+                            ticker = element
+                            break
+                    else:
+                        await message.answer(f"❌ <b>ERROR:</b> add_signal(): тикер {ticker} не поддерживается!")
+                        return
+                    break
+        except KeyError as e:
+            await message.answer(f"❌ <b>ERROR:</b> add_signal(): get 'supp_tools' except KeyError {e}")
             return
 
-        if precision == 0:
-            if '.' in value:
-                if int(value.split('.')[1]) > 0:
-                    await message.answer(f"❌ <b>ERROR:</b> значение {value} не должно содержать дробной части")
-                    return
-                else:
-                    value = value.split('.')[0]
-        else:
-            try:
-                if len(value.split('.')[1]) > precision:
-                    await message.answer(f"❌ <b>ERROR:</b> значение дробной части {value} не должно содержать "
-                                         f"количество знаков > {precision}")
-                    return
-            except IndexError:
-                pass
-
-        ret_val, err_mess = await journal.set_signal_to_file(ticker_param['ticker'], type_signal.lower(), value, ticker_param['figi'])
-        if not ret_val:
-            data = await journal.get_signals_from_file()
-            lock_state.acquire()
-            await state.update_data(signals=data)
-            lock_state.release()
-            await message.answer(f"📝 ✅ <b>set {ticker_param['ticker']} {type_signal.lower()} {value}</b>")
-        else:
+        status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
+        if status:
             await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
-    except KeyError as e:
-        await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: KeyError: {e}")
-        return
+            return
+
+        try:
+            ticker = ticker_param['ticker']
+            figi = ticker_param['figi']
+
+            precision, err_val = await get_precision_from_value(ticker_param['precision'])
+            if precision == -1:
+                await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: get_precision_from_value(): {err_val}")
+                return
+
+            if precision == 0:
+                if '.' in value:
+                    if int(value.split('.')[1]) > 0:
+                        await message.answer(f"❌ <b>ERROR:</b> значение {value} не должно содержать дробной части")
+                        return
+                    else:
+                        value = value.split('.')[0]
+            else:
+                try:
+                    if len(value.split('.')[1]) > precision:
+                        await message.answer(f"❌ <b>ERROR:</b> значение дробной части {value} не должно содержать "
+                                             f"количество знаков > {precision}")
+                        return
+                except IndexError:
+                    pass
+        except KeyError as e:
+            await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: KeyError: {e}")
+            return
+
+    ret_val, err_mess = await journal.set_signal_to_file(ticker, type_signal.lower(), value, figi)
+    if not ret_val:
+        data = await journal.get_signals_from_file()
+        lock_state.acquire()
+        await state.update_data(signals=data)
+        lock_state.release()
+        if type_signal.lower() == 'long5':
+            await message.answer(f"📝 ✅ <b>{type_signal.lower()} {ticker}</b>")
+        else:
+            await message.answer(f"📝 ✅ <b>set {ticker_param['ticker']} {type_signal.lower()} {value}</b>")
+    else:
+        await message.answer(f"❌ <b>ERROR:</b> записи сигнала в файл: {err_mess}")
 
 
 @router.message(F.text, Form.value)
@@ -389,6 +436,32 @@ async def debug_console(message: types.Message, command: CommandObject, state: F
     else:
         await message.answer(f"❌ <b>ERROR:</b> значение {command_args} не корректно.")
         return
+
+
+@router.message(Command("long5"))
+async def long5_console(message: types.Message, command: CommandObject, state: FSMContext):
+    command_args = (command.args or "").strip()
+    if not command_args or len(command_args.split()) != 1:
+        await message.answer(f"❌ Использование: <b>/long5 forts/moex</b>")
+        return
+
+    if command_args not in ['forts', 'moex']:
+        await message.answer(f"❌ Использование: <b>/long5 forts/moex</b>")
+        return
+
+    lock_state.acquire()
+    all_data = await state.get_data()
+    lock_state.release()
+    try:
+        for key, value in all_data['signals'].items():
+            if value['type_signal'].lower() == 'long5' and value['market'] == command_args:
+                await message.answer(f"📝 ✅ <b>{value['type_signal'].lower()} {value['market']}</b> уже установлен!")
+                return
+    except KeyError:
+        await message.answer(f"❌ <b>ERROR:</b> long5_console(): format state")
+        return
+
+    await add_signal(message, state, command_args, "long5", None)
 
 
 # Хэндлер на остальные текстовые сообщения
