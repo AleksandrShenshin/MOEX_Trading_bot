@@ -178,14 +178,20 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, user_
     #                              'depends': None}
 
     coefficient_multiplication_atr = 2.5
-    try:
-        if market == 'forts':
-            list_tickers = config('LONG_FIVE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
-            # TODO: получить текущие тикеры
-        elif market == 'moex':
-            # ['SBER', 'VTBR', 'GAZP', 'GMKN']
-            list_tickers = config('LONG_FIVE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+    if market == 'forts':
+        list_tickers = []
+        list_short_tickers = config('LONG_FIVE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+        for short_ticker in list_short_tickers:
+            status, ret_val, err_msg = await get_ticker_family(short_ticker)
+            if status == 0:
+                list_tickers.append(ret_val['current_ticker'])
+            else:
+                return
+    elif market == 'moex':
+        # ['SBER', 'VTBR', 'GAZP', 'GMKN']
+        list_tickers = config('LONG_FIVE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
 
+    try:
         async with lock_data_long5:
             if market not in list(data_tasks_long5.keys()):
                 data_tasks_long5[market] = {'tickers': {}, 'depends': set()}
