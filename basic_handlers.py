@@ -6,13 +6,6 @@ from decouple import config
 from maxapi import F, Router
 from maxapi.types import MessageCreated, MessageCallback, Command, CallbackButton, ButtonsPayload, Attachment
 from maxapi.enums.intent import Intent
-# from aiogram import Router, types, F
-# from aiogram.filters import CommandObject
-# from aiogram.filters.command import Command
-# from aiogram.types import InlineKeyboardButton
-# from aiogram.utils.keyboard import InlineKeyboardBuilder
-# from aiogram.fsm.context import FSMContext
-# from aiogram.fsm.state import State, StatesGroup
 from general import get_support_instruments, get_support_signals, get_precision_from_value, update_current_ticker
 from general import lock_state, storage
 from fsm_memory import FSMContextLike
@@ -21,11 +14,6 @@ logger = logging.getLogger(__name__)
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
-
-
-# class Form(StatesGroup):
-#     value = State()
-#     del_id = State()
 
 
 def create_main_menu():
@@ -202,6 +190,34 @@ async def get_list_signal(event: MessageCreated):
             await event.message.answer("❌ ОШИБКА: получения данных")
     else:
         await event.message.answer(f"Нет активных сигналов")
+
+
+@router.message_created(Command("set"))
+async def set_console(event: MessageCreated):
+    state = FSMContextLike(storage, event.from_user.user_id)
+
+    full_text = (event.message.body.text or "").strip()
+    parts = full_text.split(maxsplit=1)
+    command_args = parts[1] if len(parts) > 1 else ""
+    if not command_args or len(command_args.split()) != 3:
+        await event.message.answer(f"❌ Использование: /set TICKER TYPE_SIGNAL VALUE")
+        return
+
+    ticker, param_signal, value = command_args.split()
+
+    supp_signals = await get_support_signals()
+    for text_signal, param_val in supp_signals.items():
+        try:
+            if param_signal != param_val['param']:
+                continue
+        except KeyError as e:
+            await event.message.answer(f"❌ ERROR: set_console(): KeyError {e}")
+            break
+        else:
+            await add_signal(event.message, state, ticker, text_signal, value)
+            break
+    else:
+        await event.message.answer(f"❌ ERROR: параметр {param_signal} не корректный.")
 
 
 async def state_clear_soft(state):
@@ -490,15 +506,7 @@ async def add_signal(message, state, ticker, type_signal, value):
         await message.answer(f"❌ ERROR: записи сигнала в файл: {err_mess}")
 
 
-@router.message_created(F.message.body.text)
-async def form_state(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
-    lock_state.acquire()
-    curr_state = await state.get_state()
-    lock_state.release()
-    if curr_state != "Form.value":
-        return
-
+async def form_state(event, state):
     text = (event.message.body.text or "").strip()
 
     lock_state.acquire()
@@ -518,30 +526,18 @@ async def form_state(event: MessageCreated):
     await state_clear_soft(state)
 
 
-# @router.message(Command("set"))
-# async def set_console(message: types.Message, command: CommandObject, state: FSMContext):
-#     command_args = (command.args or "").strip()
-#     if not command_args or len(command_args.split()) != 3:
-#         await message.answer(f"❌ Использование: <b>/set TICKER TYPE_SIGNAL VALUE</b>")
-#         return
-#
-#     ticker, param_signal, value = command_args.split()
-#
-#     supp_signals = await get_support_signals()
-#     for text_signal, param_val in supp_signals.items():
-#         try:
-#             if param_signal != param_val['param']:
-#                 continue
-#         except KeyError as e:
-#             await message.answer(f"❌ <b>ERROR:</b> set_console(): KeyError {e}")
-#             break
-#         else:
-#             await add_signal(message, state, ticker, text_signal, value)
-#             break
-#     else:
-#         await message.answer(f"❌ <b>ERROR:</b> параметр {param_signal} не корректный.")
-#
-#
+@router.message_created(F.message.body.text)
+async def all_message(event: MessageCreated):
+    state = FSMContextLike(storage, event.from_user.user_id)
+    lock_state.acquire()
+    curr_state = await state.get_state()
+    lock_state.release()
+    if curr_state == "Form.value":
+        await form_state(event, state)
+    else:
+        await event.message.answer(f"Добавить парсинг сообщение: {event.message.body.text} -- консоль")
+
+
 # @router.message(F.text.lower().contains('удалить сигнал'))
 # async def cmd_del_signal(message: types.Message, state: FSMContext):
 #     builder = InlineKeyboardBuilder()
@@ -635,23 +631,3 @@ async def form_state(event: MessageCreated):
 #         return
 #
 #     await add_signal(message, state, command_args, "long5", None)
-#
-#
-# # Хэндлер на остальные текстовые сообщения
-# @router.message()
-# async def unknown_message(message: types.Message):
-#     await message.answer(f"Добавить парсинг сообщение: {message.text} -- консоль")
-
-# @router.message_created(F.message.body)
-# async def echo(event: MessageCreated):
-#     await event.message.answer(
-#         f"Повторяю2 за вами: {event.message.body.text}"
-#     )
-
-@router.message_created(F.message.body.text)
-async def echo(event: MessageCreated):
-    text = event.message.body.text
-    if text.startswith('/'):
-        return  # Игнорируем команды
-
-    await event.message.answer(f"Повторяю6 за вами: {text}")
