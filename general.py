@@ -2,23 +2,23 @@ import ast
 import copy
 import asyncio
 import journal
+import logging
 from decouple import config
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 import t_invest_lib.tinv as tinv
 import iss_moex.iss_moex as iss_moex
-from aiogram.fsm.context import FSMContext
+from fsm_memory import MemoryStorageLike, FSMContextLike
 
-USER_ID = None
 shared_tasks = {}
 data_tasks_long5 = {}
 lock_state = Lock()
 lock_data_tasks = asyncio.Lock()
 lock_data_long5 = asyncio.Lock()
 
-async def set_user_id(user_id):
-    global USER_ID
-    USER_ID = user_id
+storage = MemoryStorageLike()
+
+logger = logging.getLogger(__name__)
 
 
 async def get_support_instruments():
@@ -94,7 +94,6 @@ async def update_current_ticker(state):
 
 
 async def task_upd_curr_ticker(state):
-    global USER_ID
     global lock_state
     while True:
         ret_val, err_msg = await update_current_ticker(state)
@@ -104,7 +103,7 @@ async def task_upd_curr_ticker(state):
             lock_state.release()
             try:
                 bot = data['bot']
-                await bot.send_message(USER_ID, f"❌ <b>ОШИБКА:</b> update_current_ticker(): {err_msg}")
+                await bot.send_message(chat_id=data['chat_id'], text=f"❌ ОШИБКА: update_current_ticker(): {err_msg}")
             except KeyError:
                 pass
 
@@ -112,7 +111,7 @@ async def task_upd_curr_ticker(state):
         await asyncio.sleep(1*60*60)
 
 
-async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, user_id):
+async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
     fl_run_stream = False
     try:
         async with lock:
@@ -145,18 +144,18 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, user_id):
                         (candle_time_received.minute != time_send_msg.minute):
                         time_send_msg = candle_time_received
                         msg_to_print = f"🤖 {param_signal['ticker']} {param_signal['type_signal']} {candle_volume} >= {param_signal['value']}"
-                        await bot.send_message(user_id, msg_to_print)
+                        await bot.send_message(chat_id=chat_id, text=msg_to_print)
             elif param_signal['type_signal'] == 'price':
                 msg_to_print = ""
 
                 if candle_high >= float(param_signal['value']) and candle_low <= float(param_signal['value']):
-                    msg_to_print = f"📈 {param_signal['ticker']} {param_signal['type_signal']} {candle_high} &gt;= {param_signal['value']}"    # > заменён на &gt; согласно HTML-разметке
+                    msg_to_print = f"📈 {param_signal['ticker']} {param_signal['type_signal']} {candle_high} >= {param_signal['value']}"
                 elif candle_low <= float(param_signal['value']) and candle_high >= float(param_signal['value']):
-                    msg_to_print = f"📉 {param_signal['ticker']} {param_signal['type_signal']} {candle_low} &lt;= {param_signal['value']}"    # < заменён на &lt; согласно HTML-разметке
+                    msg_to_print = f"📉 {param_signal['ticker']} {param_signal['type_signal']} {candle_low} <= {param_signal['value']}"
 
                 if msg_to_print:
                     # TODO: значение price выводить в соответствии с точностью инструмента
-                    await bot.send_message(user_id, msg_to_print)
+                    await bot.send_message(chat_id=chat_id, text=msg_to_print)
                     break
 
             await asyncio.sleep(2)
@@ -164,13 +163,13 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, user_id):
         pass
     except Exception as e:
         print(f"fetch_data_ticker(): ERROR: {type(e).__name__}: {e}", flush=True)
-        await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> удалён сигнал: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
+        await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
     finally:
         async with lock:
             shared_tasks[param_signal['ticker']]['depends'].discard(asyncio.current_task())
 
 
-async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, user_id):
+async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
     # data_tasks_long5 = {'forts': {},
     #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'ticker': '', 'prev_bin': -1,
     #                                                 'cur_atr': {'high': None, 'low': None, 'time_received': None}},
@@ -199,7 +198,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, user_
                 for ticker in list_tickers:
                     status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
                     if status:
-                        await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> long5 {market} получение параметров {ticker}: {err_mess}")
+                        await bot.send_message(chat_id=chat_id, text=f"❌ <b>ОШИБКА:</b> long5 {market} получение параметров {ticker}: {err_mess}")
                         return
                     else:
                         data_tasks_long5[market]['tickers'][ticker_param['figi']] = {'atr': [],
@@ -228,21 +227,20 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, user_
                             time_send_msg = ticker_param['cur_atr']['time_received']
                             prev_bin = (ticker_param['cur_atr']['time_received'].minute // 5)
                             msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
-                            await bot.send_message(user_id, msg_to_print)
+                            await bot.send_message(chat_id=chat_id, text=msg_to_print)
             await asyncio.sleep(2)
     except asyncio.CancelledError:
         pass
     except Exception as e:
         print(f"fetch_data_long5(): ERROR: {type(e).__name__}: {e}", flush=True)
-        await bot.send_message(user_id, f"❌ <b>ОШИБКА:</b> удалён сигнал: long5 {market}")
+        await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
     finally:
         async with lock_data_long5:
             data_tasks_long5[market]['depends'].discard(asyncio.current_task())
 
 
 # Define your infinite loop function
-async def moex_infinite_loop(state: FSMContext):
-    global USER_ID
+async def moex_infinite_loop(state: FSMContextLike):
     global shared_tasks
     global data_tasks_long5
     global lock_state
@@ -254,54 +252,52 @@ async def moex_infinite_loop(state: FSMContext):
 
     # TODO: Что будет если идет опрос тикера которого больше нет
     while True:
-        if USER_ID is not None:
-            # Add your desired logic here
-            lock_state.acquire()
-            data = await state.get_data()
-            bot = data['bot']
-            debug_param = data['debug']
-            await state.update_data(debug=None)
-            lock_state.release()
+        # Add your desired logic here
+        lock_state.acquire()
+        data = await state.get_data()
+        debug_param = data['debug']
+        await state.update_data(debug=None)
+        lock_state.release()
 
-            if debug_param == "get_tasks":
-                msg_to_print = f"🍳 <b>Список опрашеваемых ID сигналов:</b>\n"
-                for param_curr_tasks in curr_tasks.values():
-                    msg_to_print += f"{param_curr_tasks['id']}\n"
-                await bot.send_message(USER_ID, msg_to_print)
+        if debug_param == "get_tasks":
+            msg_to_print = f"🍳 Список опрашеваемых ID сигналов:\n"
+            for param_curr_tasks in curr_tasks.values():
+                msg_to_print += f"{param_curr_tasks['id']}\n"
+            await data['bot'].send_message(chat_id=data['chat_id'], text=msg_to_print)
 
-            list_unique_id = []
+        list_unique_id = []
 
-            # В случае появления нового сигнала - создаём для него задачу
-            for id_signal, param_signal in data['signals'].items():
-                list_unique_id.append(param_signal['unique_id'])
-                if param_signal['unique_id'] not in curr_tasks:
-                    curr_param_task = {}
-                    if param_signal['type_signal'] == 'price' or param_signal['type_signal'] == 'volume':
-                        task = asyncio.create_task(fetch_data_ticker(lock_data_tasks, shared_tasks, param_signal, bot, USER_ID))
-                    elif param_signal['type_signal'] == 'long5':
-                        task = asyncio.create_task(fetch_data_long5(lock_data_long5, data_tasks_long5, param_signal['market'], bot, USER_ID))
-                    curr_param_task['id'] = id_signal
-                    curr_param_task['task'] = task
-                    curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
+        # В случае появления нового сигнала - создаём для него задачу
+        for id_signal, param_signal in data['signals'].items():
+            list_unique_id.append(param_signal['unique_id'])
+            if param_signal['unique_id'] not in curr_tasks:
+                curr_param_task = {}
+                if param_signal['type_signal'] == 'price' or param_signal['type_signal'] == 'volume':
+                    task = asyncio.create_task(fetch_data_ticker(lock_data_tasks, shared_tasks, param_signal, data['bot'], data['chat_id']))
+                elif param_signal['type_signal'] == 'long5':
+                    task = asyncio.create_task(fetch_data_long5(lock_data_long5, data_tasks_long5, param_signal['market'], data['bot'], data['chat_id']))
+                curr_param_task['id'] = id_signal
+                curr_param_task['task'] = task
+                curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
 
-            for unique_id in list(curr_tasks.keys()):
-                if unique_id not in list_unique_id:
-                    # В случае удаления сигнала - удаляем задачу
-                    task = curr_tasks[unique_id]['task']
-                    task.cancel()
-                    curr_tasks.pop(unique_id, None)
-                else:
-                    # В случае завершения задачи - удаляем сигнал
-                    task = curr_tasks[unique_id]['task']
-                    if task.done():
-                        done_task = curr_tasks.pop(unique_id, None)
-                        ret_val, err_mess = await journal.del_signal_from_file(done_task['id'])
-                        if ret_val:
-                            await bot.send_message(USER_ID, f"❌ <b>ERROR:</b> удаления сигнала: {err_mess}")
-                        else:
-                            data = await journal.get_signals_from_file()
-                            lock_state.acquire()
-                            await state.update_data(signals=data)
-                            lock_state.release()
+        for unique_id in list(curr_tasks.keys()):
+            if unique_id not in list_unique_id:
+                # В случае удаления сигнала - удаляем задачу
+                task = curr_tasks[unique_id]['task']
+                task.cancel()
+                curr_tasks.pop(unique_id, None)
+            else:
+                # В случае завершения задачи - удаляем сигнал
+                task = curr_tasks[unique_id]['task']
+                if task.done():
+                    done_task = curr_tasks.pop(unique_id, None)
+                    ret_val, err_mess = await journal.del_signal_from_file(done_task['id'])
+                    if ret_val:
+                        await data['bot'].send_message(chat_id=data['chat_id'], text=f"❌ ERROR: удаления сигнала: {err_mess}")
+                    else:
+                        data = await journal.get_signals_from_file()
+                        lock_state.acquire()
+                        await state.update_data(signals=data)
+                        lock_state.release()
 
         await asyncio.sleep(5)  # Sleep for 5 seconds to avoid busy-waiting
