@@ -1,4 +1,5 @@
 import os
+import asyncio
 import journal
 import t_invest_lib.tinv as tinv
 import logging
@@ -6,7 +7,7 @@ from decouple import config
 from maxapi import F, Router
 from maxapi.types import MessageCreated, MessageCallback, Command, CallbackButton, ButtonsPayload, Attachment
 from maxapi.enums.intent import Intent
-from general import get_support_instruments, get_support_signals, get_precision_from_value, update_current_ticker
+from general import get_support_instruments, get_support_signals, get_precision_from_value, update_current_ticker, moex_infinite_loop
 from general import lock_state, storage
 from fsm_memory import FSMContextLike
 
@@ -75,10 +76,9 @@ async def cmd_start(event: MessageCreated):
     lock_state.acquire()
     await state.clear()
     await state.update_data(bot=event.bot)
+    await state.update_data(chat_id=event.chat.chat_id)
     await state.update_data(debug=None)
     lock_state.release()
-
-#     await set_user_id(message.from_user.id)       # TODO:
 
     ret_val, err_msg = await update_current_ticker(state)
     if ret_val:
@@ -97,7 +97,7 @@ async def cmd_start(event: MessageCreated):
     await event.bot.edit_message(message_id=msg.message.body.mid, text=stat_init)
 
     # Start the infinite loop as a background task
-#     asyncio.create_task(moex_infinite_loop(state))    # TODO:
+    asyncio.create_task(moex_infinite_loop(state))
 
     menu_buttons = create_main_menu()
     await event.message.answer("MOEX Trading Bot is running", attachments=[menu_buttons])
@@ -125,7 +125,7 @@ async def cmd_help(event: MessageCreated):
                     if '<<<<<' in line:
                         break
                     else:
-                        readme_message += line                      # TODO: поработать с форматированием
+                        readme_message += line
                 elif '>>>>>' in line:
                     fl_wr_line = True
     except FileNotFoundError:
@@ -506,7 +506,7 @@ async def add_signal(message, state, ticker, type_signal, value):
         await message.answer(f"❌ ERROR: записи сигнала в файл: {err_mess}")
 
 
-async def form_state(event, state):
+async def form_add_signal(event, state):
     text = (event.message.body.text or "").strip()
 
     lock_state.acquire()
@@ -526,6 +526,133 @@ async def form_state(event, state):
     await state_clear_soft(state)
 
 
+@router.message_callback(F.callback.payload == "cmd_del_signal")
+async def callback_del_signal(event: MessageCallback):
+    state = FSMContextLike(storage, event.from_user.user_id)
+
+    # Кнопка "Отмена"
+    buttons = [[
+        {
+            "type": "callback",
+            "text": "Отмена",
+            "payload": "cancel_signal",
+        }
+    ]]
+    keyboard_attachment = Attachment(
+        type="inline_keyboard",
+        payload={"buttons": buttons},
+    )
+
+    msg = await event.message.answer(
+        "Введите ID сигнала для удаления:",
+        attachments=[keyboard_attachment],
+    )
+
+    lock_state.acquire()
+    await state.update_data(msg_id_for_del=msg.message.body.mid)
+    await state.set_state("Form.del_id")
+    lock_state.release()
+
+
+async def del_signal(message, state, id_signal):
+    ret_val, err_mess = await journal.del_signal_from_file(id_signal)
+    if ret_val:
+        await message.answer(f"❌ ERROR: удаления сигнала: {err_mess}")
+    else:
+        data = await journal.get_signals_from_file()
+        lock_state.acquire()
+        await state.update_data(signals=data)
+        lock_state.release()
+        await message.answer(f"❎ OK: сигнал id={id_signal} успешно удалён.")
+
+
+async def form_del_id(event, state):
+    lock_state.acquire()
+    data = await state.get_data()
+    lock_state.release()
+
+    # Удалить сообщение с введённым значением нельзя из-за ограничения MAX - бот может удалять только свои исходящие сообщения
+    # Удаляем старое сообщение с клавиатурой
+    try:
+        await event.bot.delete_message(message_id=data["msg_id_for_del"])
+    except KeyError:
+        pass  # если не сохранили id — просто ничего не удаляем
+
+    await del_signal(event.message, state, event.message.body.text)
+    await state_clear_soft(state)
+
+
+@router.message_created(Command("del"))
+async def del_console(event: MessageCreated):
+    state = FSMContextLike(storage, event.from_user.user_id)
+
+    full_text = (event.message.body.text or "").strip()
+    parts = full_text.split(maxsplit=1)
+    command_args = parts[1] if len(parts) > 1 else ""
+    if not command_args or len(command_args.split()) != 1:
+        await event.message.answer(f"❌ Использование: /del id_signal")
+        return
+
+    id_signal: str = command_args
+    try:
+        int(id_signal)
+    except (ValueError, TypeError):
+        await event.message.answer(f"❌ ERROR: значение id_signal должно быть int.")
+        return
+
+    await del_signal(event.message, state, id_signal)
+
+
+@router.message_created(Command("debug"))
+async def debug_console(event: MessageCreated):
+    state = FSMContextLike(storage, event.from_user.user_id)
+
+    full_text = (event.message.body.text or "").strip()
+    parts = full_text.split(maxsplit=1)
+    command_args = parts[1] if len(parts) > 1 else ""
+    if not command_args or len(command_args.split()) != 1:
+        await event.message.answer(f"❌ Использование: /debug PARAM")
+        return
+
+    if command_args == "get_tasks":
+        lock_state.acquire()
+        await state.update_data(debug="get_tasks")
+        lock_state.release()
+    else:
+        await event.message.answer(f"❌ ERROR: значение {command_args} не корректно.")
+        return
+
+
+@router.message_created(Command("long5"))
+async def long5_console(event: MessageCreated):
+    state = FSMContextLike(storage, event.from_user.user_id)
+
+    full_text = (event.message.body.text or "").strip()
+    parts = full_text.split(maxsplit=1)
+    command_args = parts[1] if len(parts) > 1 else ""
+    if not command_args or len(command_args.split()) != 1:
+        await event.message.answer(f"❌ Использование: /long5 forts/moex")
+        return
+
+    if command_args not in ['forts', 'moex']:
+        await event.message.answer(f"❌ Использование: /long5 forts/moex")
+        return
+
+    lock_state.acquire()
+    all_data = await state.get_data()
+    lock_state.release()
+    try:
+        for key, value in all_data['signals'].items():
+            if value['type_signal'].lower() == 'long5' and value['market'] == command_args:
+                await event.message.answer(f"📝 ✅ {value['type_signal'].lower()} {value['market']} уже установлен!")
+                return
+    except KeyError:
+        await event.message.answer(f"❌ ERROR: long5_console(): format state")
+        return
+
+    await add_signal(event.message, state, command_args, "long5", None)
+
+
 @router.message_created(F.message.body.text)
 async def all_message(event: MessageCreated):
     state = FSMContextLike(storage, event.from_user.user_id)
@@ -533,101 +660,8 @@ async def all_message(event: MessageCreated):
     curr_state = await state.get_state()
     lock_state.release()
     if curr_state == "Form.value":
-        await form_state(event, state)
+        await form_add_signal(event, state)
+    elif curr_state == "Form.del_id":
+        await form_del_id(event, state)
     else:
         await event.message.answer(f"Добавить парсинг сообщение: {event.message.body.text} -- консоль")
-
-
-# @router.message(F.text.lower().contains('удалить сигнал'))
-# async def cmd_del_signal(message: types.Message, state: FSMContext):
-#     builder = InlineKeyboardBuilder()
-#
-#     builder.button(text="Отмена", callback_data=f"cancel_signal")
-#
-#     msg = await message.answer(
-#         "Введите ID сигнала для удаления:",
-#         reply_markup=builder.as_markup()
-#     )
-#     lock_state.acquire()
-#     await state.update_data(msg_id_for_del=msg.message_id)
-#     await state.set_state(Form.del_id)
-#     lock_state.release()
-#
-#
-# async def del_signal(message, state, id_signal):
-#     ret_val, err_mess = await journal.del_signal_from_file(id_signal)
-#     if ret_val:
-#         await message.answer(f"❌ <b>ERROR:</b> удаления сигнала: {err_mess}")
-#     else:
-#         data = await journal.get_signals_from_file()
-#         lock_state.acquire()
-#         await state.update_data(signals=data)
-#         lock_state.release()
-#         await message.answer(f"❎ <b>OK:</b> сигнал id={id_signal} успешно удалён.")
-#
-#
-# @router.message(F.text, Form.del_id)
-# async def form_del_id(message: types.Message, state: FSMContext):
-#     lock_state.acquire()
-#     data = await state.get_data()
-#     lock_state.release()
-#
-#     await message.delete()
-#     await message.bot.delete_message(chat_id=message.from_user.id, message_id=data['msg_id_for_del'])
-#
-#     await del_signal(message, state, message.text)
-#     await state_clear_soft(state)
-#
-#
-# @router.message(Command("del"))
-# async def del_console(message: types.Message, command: CommandObject, state: FSMContext):
-#     id_signal: str = command.args
-#     try:
-#         int(id_signal)
-#     except (ValueError, TypeError):
-#         await message.answer(f"❌ <b>ERROR:</b> укажите значение id_signal (должно быть целым).")
-#         return
-#
-#     await del_signal(message, state, id_signal)
-#
-#
-# @router.message(Command("debug"))
-# async def debug_console(message: types.Message, command: CommandObject, state: FSMContext):
-#     command_args = (command.args or "").strip()
-#     if not command_args or len(command_args.split()) != 1:
-#         await message.answer(f"❌ Использование: <b>/debug PARAM</b>")
-#         return
-#
-#     if command_args == "get_tasks":
-#         lock_state.acquire()
-#         await state.update_data(debug="get_tasks")
-#         lock_state.release()
-#     else:
-#         await message.answer(f"❌ <b>ERROR:</b> значение {command_args} не корректно.")
-#         return
-#
-#
-# @router.message(Command("long5"))
-# async def long5_console(message: types.Message, command: CommandObject, state: FSMContext):
-#     command_args = (command.args or "").strip()
-#     if not command_args or len(command_args.split()) != 1:
-#         await message.answer(f"❌ Использование: <b>/long5 forts/moex</b>")
-#         return
-#
-#     if command_args not in ['forts', 'moex']:
-#         await message.answer(f"❌ Использование: <b>/long5 forts/moex</b>")
-#         return
-#
-#     lock_state.acquire()
-#     all_data = await state.get_data()
-#     lock_state.release()
-#     try:
-#         for key, value in all_data['signals'].items():
-#             if value['type_signal'].lower() == 'long5' and value['market'] == command_args:
-#                 await message.answer(f"📝 ✅ <b>{value['type_signal'].lower()} {value['market']}</b> уже установлен!")
-#                 return
-#     except KeyError:
-#         await message.answer(f"❌ <b>ERROR:</b> long5_console(): format state")
-#         return
-#
-#     await add_signal(message, state, command_args, "long5", None)

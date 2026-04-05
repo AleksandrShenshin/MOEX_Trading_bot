@@ -28,6 +28,7 @@ _param_ - -p - price, -v - volume, -c - long5
 /start - запуск Бота  
 /stop - остановка Бота  
 /menu - главное меню с кнопками  
+/help - показать список комманд  
 /get_signals - список установленных сигналов  
 /del id_signal - удалить сигнал по его ID  
 /set TICKER TYPE_SIGNAL VALUE  
