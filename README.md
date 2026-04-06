@@ -3,12 +3,14 @@
 - достижение ценой заданного значения
 - появление объёма на 1m свече >= заданного значения
 - поиск инструмента с 5м свечой значительно превышающей по размеру предыдущие
+- поиск пробросов
 
 ## Настройка
 > [!TIP]
 > Перед запуском бота необходимо в файле **.env** установить следующие параметры:
 > - **MAX_BOT_TOKEN** = 8298363621:AAGKkemhznX0JmbzrIHnjrtaxjTTbFOYLX0 (указываем токен MAX bot)  
 > - **MAX_USER_ID** = 198198198  
+> - **T_TOKEN** = 8298363621:AAGKkemhznX0JmbzrIHnjrtaxjTTbFOYLX0 (указываем токен T invest)  
 > - **FUTURES_LIST** = si, cr (список поддерживаемых фьючерсов)  
 В списке указываются первые две буквы тикера (неизменны при смене контракта) через ',' 
 > - **TYPES_SIGNAL** = _{'Price': {'param': '-p'}, 'Volume': {'param': '-v'}, 'Long5': {'param': '-c'}}_  
@@ -16,8 +18,8 @@
 Формат  
 _Price, Volume, Long5_ - название которое будет видно в боте  
 _param_ - -p - price, -v - volume, -c - long5  
-> - **LONG_FIVE_FORTS** = BR, GD, SV, NG, MX, Si, BM, CR, RI, FF, SF, MM  
-> - **LONG_FIVE_MOEX** = SBER, VTBR, GAZP, GMKN, OZON, SMLT, YDEX, LKOH  
+> - **CANDLE_FORTS** = BR, GD, SV, NG, MX, Si, BM, CR, RI, FF, SF, MM 	
+> - **CANDLE_MOEX** = SBER, VTBR, GAZP, GMKN, OZON, SMLT, YDEX, LKOH  
 
 > [!WARNING]
 > Для работы необходимо в директорию проекта установить следующие пакеты:  

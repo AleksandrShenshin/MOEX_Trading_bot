@@ -312,7 +312,7 @@ async def handle_set_type_signal(event: MessageCallback):
     buttons: list[list[dict]] = []
     row: list[dict] = []
 
-    if type_signal == "long5":
+    if type_signal == "long5" or type_signal == "throws":
         for market in ["forts", "moex"]:
             row.append({
                 "type": "callback",
@@ -344,7 +344,7 @@ async def handle_set_type_signal(event: MessageCallback):
     # Редактируем текст исходного сообщения
     mid = event.message.body.mid
 
-    if type_signal == "long5":
+    if type_signal == "long5" or type_signal == "throws":
         new_text = "Выберите рынок:"
     else:
         new_text = "Выберите инструмент:"
@@ -375,13 +375,14 @@ async def handle_set_ticker(event: MessageCallback):
 
         try:
             for key, value in all_data["signals"].items():
-                if value["type_signal"].lower() == "long5" and value["market"] == ticker:
+                if (value["type_signal"].lower() == "long5" and value["market"] == ticker) \
+                    or (value["type_signal"].lower() == "throws" and value["market"] == ticker):
                     await event.message.answer(f"📝 ✅ {value['type_signal'].lower()} {value['market']} уже установлен!")
                     return
         except KeyError:
             await event.message.answer("❌ ERROR: handle_set_ticker(): format state")
         else:
-            await add_signal(event.message, state, ticker, "long5", None)
+            await add_signal(event.message, state, ticker, all_data["type_signal"], None)
     else:
         lock_state.acquire()
         await state.update_data(ticker=ticker)
@@ -447,7 +448,7 @@ async def add_signal(message, state, ticker, type_signal, value):
             await message.answer(f"❌ ERROR: значение {value} должно содержать только цифры")
             return
 
-    if type_signal.lower() == 'long5':
+    if type_signal.lower() == 'long5' or type_signal.lower() == 'throws':
         figi = None
     else:
         try:
@@ -509,7 +510,7 @@ async def add_signal(message, state, ticker, type_signal, value):
         lock_state.acquire()
         await state.update_data(signals=data)
         lock_state.release()
-        if type_signal.lower() == 'long5':
+        if type_signal.lower() == 'long5' or type_signal.lower() == 'throws':
             await message.answer(f"📝 ✅ {type_signal.lower()} {ticker}")
         else:
             await message.answer(f"📝 ✅ set {ticker_param['ticker']} {type_signal.lower()} {value}")
