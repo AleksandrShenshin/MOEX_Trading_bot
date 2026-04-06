@@ -112,6 +112,8 @@ async def task_upd_curr_ticker(state):
 
 
 async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
+    fl_init_curr_pos = False
+    fl_pos_high = False
     fl_run_stream = False
     try:
         async with lock:
@@ -137,6 +139,10 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
             if candle_high == None or candle_low == None or candle_volume == None:
                 await asyncio.sleep(3)
                 continue
+            elif fl_init_curr_pos == False:
+                if candle_high >= float(param_signal['value']) and candle_low >= float(param_signal['value']):
+                    fl_pos_high = True
+                    fl_init_curr_pos = True
 
             if param_signal['type_signal'] == 'volume':
                 if int(candle_volume) >= int(param_signal['value']):
@@ -148,9 +154,9 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
             elif param_signal['type_signal'] == 'price':
                 msg_to_print = ""
 
-                if candle_high >= float(param_signal['value']) and candle_low <= float(param_signal['value']):
+                if candle_high >= float(param_signal['value']) and candle_low <= float(param_signal['value']) and not fl_pos_high:
                     msg_to_print = f"📈 {param_signal['ticker']} {param_signal['type_signal']} {candle_high} >= {param_signal['value']}"
-                elif candle_low <= float(param_signal['value']) and candle_high >= float(param_signal['value']):
+                elif candle_low <= float(param_signal['value']) and candle_high >= float(param_signal['value']) and fl_pos_high:
                     msg_to_print = f"📉 {param_signal['ticker']} {param_signal['type_signal']} {candle_low} <= {param_signal['value']}"
 
                 if msg_to_print:
@@ -176,7 +182,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     #                                          figi: {}},
     #                              'depends': None}
 
-    coefficient_multiplication_atr = 2.5        # TODO: to .env
+    coefficient_multiplication_atr = 2.5
     if market == 'forts':
         list_tickers = []
         list_short_tickers = config('CANDLE_FIVE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
@@ -250,7 +256,6 @@ async def moex_infinite_loop(state: FSMContextLike):
 
     asyncio.create_task(task_upd_curr_ticker(state))
 
-    # TODO: Что будет если идет опрос тикера которого больше нет
     while True:
         # Add your desired logic here
         lock_state.acquire()
