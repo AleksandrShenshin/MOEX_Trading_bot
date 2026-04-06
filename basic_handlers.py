@@ -80,21 +80,26 @@ async def cmd_start(event: MessageCreated):
     await state.update_data(debug=None)
     lock_state.release()
 
-    ret_val, err_msg = await update_current_ticker(state)
-    if ret_val:
-        await event.message.answer(f"❌ ОШИБКА: {err_msg}\n\nBot: Process finished with exit code -1")
+    try:
+        ret_val, err_msg = await update_current_ticker(state)
+        if ret_val:
+            await event.message.answer(f"❌ ОШИБКА: {err_msg}\n\nBot: Process finished with exit code -1")
+            os._exit(-1)
+        else:
+            stat_init = "✅ Получение тикеров"
+            msg = await event.message.answer(stat_init)
+
+        data = await journal.get_signals_from_file()
+        lock_state.acquire()
+        await state.update_data(signals=data)
+        lock_state.release()
+
+        stat_init = f"{stat_init}\n✅ Получение сигналов"
+        await event.bot.edit_message(message_id=msg.message.body.mid, text=stat_init)
+    except Exception as e:
+        logger.error(f"Command('start'): ERROR: {type(e).__name__}: {e}")
+        await event.message.answer(f"❌ ОШИБКА: {type(e).__name__}: {e}\n\nBot: Process finished with exit code -1")
         os._exit(-1)
-    else:
-        stat_init = "✅ Получение тикеров"
-        msg = await event.message.answer(stat_init)
-
-    data = await journal.get_signals_from_file()
-    lock_state.acquire()
-    await state.update_data(signals=data)
-    lock_state.release()
-
-    stat_init = f"{stat_init}\n✅ Получение сигналов"
-    await event.bot.edit_message(message_id=msg.message.body.mid, text=stat_init)
 
     # Start the infinite loop as a background task
     asyncio.create_task(moex_infinite_loop(state))
@@ -234,18 +239,24 @@ async def state_clear_soft(state):
         signals = {}
 
     try:
-        bot = data['bot']
+        chat_id = data['chat_id']
     except KeyError:
-        bot = None
+        chat_id = None
 
     try:
         debug = data['debug']
     except KeyError:
         debug = None
 
+    try:
+        bot = data['bot']
+    except KeyError:
+        bot = None
+
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
     await state.update_data(signals=signals)
+    await state.update_data(chat_id=chat_id)
     await state.update_data(debug=debug)
     await state.update_data(bot=bot)
     lock_state.release()
