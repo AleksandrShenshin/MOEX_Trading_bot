@@ -176,10 +176,10 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     #                                          figi: {}},
     #                              'depends': None}
 
-    coefficient_multiplication_atr = 2.5
+    coefficient_multiplication_atr = 2.5        # TODO: to .env
     if market == 'forts':
         list_tickers = []
-        list_short_tickers = config('LONG_FIVE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_short_tickers = config('CANDLE_FIVE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
         for short_ticker in list_short_tickers:
             status, ret_val, err_msg = await get_ticker_family(short_ticker)
             if status == 0:
@@ -188,7 +188,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 return
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
-        list_tickers = config('LONG_FIVE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_tickers = config('CANDLE_FIVE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
 
     try:
         async with lock_data_long5:
