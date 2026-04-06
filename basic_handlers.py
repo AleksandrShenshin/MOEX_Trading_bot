@@ -170,7 +170,7 @@ async def get_list_signal(event: MessageCreated):
 
         list_signals = []
         for key, value in data.items():
-            if value['type_signal'].lower() == 'long5':
+            if value['type_signal'].lower() == 'long5' or value['type_signal'].lower() == 'throws':
                 continue
             curr_signal = value.copy()
             curr_signal['id'] = key
@@ -188,7 +188,7 @@ async def get_list_signal(event: MessageCreated):
             for signal in list_signals:
                 msg_to_print += f"{signal['id']}: {signal['ticker']} {signal['type_signal']} {data[signal['id']]['value']}\n"
             for key, value in data.items():
-                if value['type_signal'].lower() == 'long5':
+                if value['type_signal'].lower() == 'long5' or value['type_signal'].lower() == 'throws':
                     msg_to_print += f"{key}: {value['type_signal']} {value['market']}\n"
             await event.message.answer(msg_to_print)
         except KeyError:
@@ -375,8 +375,7 @@ async def handle_set_ticker(event: MessageCallback):
 
         try:
             for key, value in all_data["signals"].items():
-                if (value["type_signal"].lower() == "long5" and value["market"] == ticker) \
-                    or (value["type_signal"].lower() == "throws" and value["market"] == ticker):
+                if (value["type_signal"].lower() == all_data["type_signal"] and value["market"] == ticker):
                     await event.message.answer(f"📝 ✅ {value['type_signal'].lower()} {value['market']} уже установлен!")
                     return
         except KeyError:
