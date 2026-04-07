@@ -41,7 +41,7 @@ async def set_signal_to_file(ticker, type_signal, value, figi):
         else:
             break
 
-    if type_signal.lower() == 'long5':
+    if type_signal.lower() == 'long5' or type_signal.lower() == 'throws':
         signals[str(new_id)] = {'type_signal': type_signal, 'market': ticker, 'unique_id': unique_id}
     else:
         signals[str(new_id)] = {'ticker': ticker, 'type_signal': type_signal, 'value': value, 'figi': figi, 'unique_id': unique_id}

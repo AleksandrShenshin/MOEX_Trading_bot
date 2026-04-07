@@ -80,21 +80,26 @@ async def cmd_start(event: MessageCreated):
     await state.update_data(debug=None)
     lock_state.release()
 
-    ret_val, err_msg = await update_current_ticker(state)
-    if ret_val:
-        await event.message.answer(f"❌ ОШИБКА: {err_msg}\n\nBot: Process finished with exit code -1")
+    try:
+        ret_val, err_msg = await update_current_ticker(state)
+        if ret_val:
+            await event.message.answer(f"❌ ОШИБКА: {err_msg}\n\nBot: Process finished with exit code -1")
+            os._exit(-1)
+        else:
+            stat_init = "✅ Получение тикеров"
+            msg = await event.message.answer(stat_init)
+
+        data = await journal.get_signals_from_file()
+        lock_state.acquire()
+        await state.update_data(signals=data)
+        lock_state.release()
+
+        stat_init = f"{stat_init}\n✅ Получение сигналов"
+        await event.bot.edit_message(message_id=msg.message.body.mid, text=stat_init)
+    except Exception as e:
+        logger.error(f"Command('start'): ERROR: {type(e).__name__}: {e}")
+        await event.message.answer(f"❌ ОШИБКА: {type(e).__name__}: {e}\n\nBot: Process finished with exit code -1")
         os._exit(-1)
-    else:
-        stat_init = "✅ Получение тикеров"
-        msg = await event.message.answer(stat_init)
-
-    data = await journal.get_signals_from_file()
-    lock_state.acquire()
-    await state.update_data(signals=data)
-    lock_state.release()
-
-    stat_init = f"{stat_init}\n✅ Получение сигналов"
-    await event.bot.edit_message(message_id=msg.message.body.mid, text=stat_init)
 
     # Start the infinite loop as a background task
     asyncio.create_task(moex_infinite_loop(state))
@@ -165,7 +170,7 @@ async def get_list_signal(event: MessageCreated):
 
         list_signals = []
         for key, value in data.items():
-            if value['type_signal'].lower() == 'long5':
+            if value['type_signal'].lower() == 'long5' or value['type_signal'].lower() == 'throws':
                 continue
             curr_signal = value.copy()
             curr_signal['id'] = key
@@ -183,7 +188,7 @@ async def get_list_signal(event: MessageCreated):
             for signal in list_signals:
                 msg_to_print += f"{signal['id']}: {signal['ticker']} {signal['type_signal']} {data[signal['id']]['value']}\n"
             for key, value in data.items():
-                if value['type_signal'].lower() == 'long5':
+                if value['type_signal'].lower() == 'long5' or value['type_signal'].lower() == 'throws':
                     msg_to_print += f"{key}: {value['type_signal']} {value['market']}\n"
             await event.message.answer(msg_to_print)
         except KeyError:
@@ -234,18 +239,24 @@ async def state_clear_soft(state):
         signals = {}
 
     try:
-        bot = data['bot']
+        chat_id = data['chat_id']
     except KeyError:
-        bot = None
+        chat_id = None
 
     try:
         debug = data['debug']
     except KeyError:
         debug = None
 
+    try:
+        bot = data['bot']
+    except KeyError:
+        bot = None
+
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
     await state.update_data(signals=signals)
+    await state.update_data(chat_id=chat_id)
     await state.update_data(debug=debug)
     await state.update_data(bot=bot)
     lock_state.release()
@@ -301,7 +312,7 @@ async def handle_set_type_signal(event: MessageCallback):
     buttons: list[list[dict]] = []
     row: list[dict] = []
 
-    if type_signal == "long5":
+    if type_signal == "long5" or type_signal == "throws":
         for market in ["forts", "moex"]:
             row.append({
                 "type": "callback",
@@ -333,7 +344,7 @@ async def handle_set_type_signal(event: MessageCallback):
     # Редактируем текст исходного сообщения
     mid = event.message.body.mid
 
-    if type_signal == "long5":
+    if type_signal == "long5" or type_signal == "throws":
         new_text = "Выберите рынок:"
     else:
         new_text = "Выберите инструмент:"
@@ -364,13 +375,13 @@ async def handle_set_ticker(event: MessageCallback):
 
         try:
             for key, value in all_data["signals"].items():
-                if value["type_signal"].lower() == "long5" and value["market"] == ticker:
+                if (value["type_signal"].lower() == all_data["type_signal"] and value["market"] == ticker):
                     await event.message.answer(f"📝 ✅ {value['type_signal'].lower()} {value['market']} уже установлен!")
                     return
         except KeyError:
             await event.message.answer("❌ ERROR: handle_set_ticker(): format state")
         else:
-            await add_signal(event.message, state, ticker, "long5", None)
+            await add_signal(event.message, state, ticker, all_data["type_signal"], None)
     else:
         lock_state.acquire()
         await state.update_data(ticker=ticker)
@@ -436,7 +447,7 @@ async def add_signal(message, state, ticker, type_signal, value):
             await message.answer(f"❌ ERROR: значение {value} должно содержать только цифры")
             return
 
-    if type_signal.lower() == 'long5':
+    if type_signal.lower() == 'long5' or type_signal.lower() == 'throws':
         figi = None
     else:
         try:
@@ -498,7 +509,7 @@ async def add_signal(message, state, ticker, type_signal, value):
         lock_state.acquire()
         await state.update_data(signals=data)
         lock_state.release()
-        if type_signal.lower() == 'long5':
+        if type_signal.lower() == 'long5' or type_signal.lower() == 'throws':
             await message.answer(f"📝 ✅ {type_signal.lower()} {ticker}")
         else:
             await message.answer(f"📝 ✅ set {ticker_param['ticker']} {type_signal.lower()} {value}")

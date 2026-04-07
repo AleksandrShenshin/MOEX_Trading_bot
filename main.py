@@ -11,8 +11,6 @@ bot = Bot(token=config('MAX_BOT_TOKEN'))
 # Диспетчер
 dp = Dispatcher()
 
-# TODO: добавить автоматический поиск прострелов
-
 
 # Обработчик нажатия кнопки "Начать" (первый запуск)
 @dp.bot_started()
