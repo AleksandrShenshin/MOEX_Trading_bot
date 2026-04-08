@@ -20,7 +20,7 @@ async def handle_bot_started(event: BotStarted):
     name = getattr(user, 'first_name', None) or 'friend'
 
     if str(user.user_id) == config('MAX_USER_ID'):
-        logger.info(f"New user: {name} (ID: {user.user_id})")
+        logger.warning(f"New user: {name} (ID: {user.user_id})")
 
         await event.bot.send_message(
             chat_id=event.chat_id,
@@ -29,7 +29,7 @@ async def handle_bot_started(event: BotStarted):
                  "Используйте /help для справки."
         )
     else:
-        logger.info(f"Access denied: {name} (ID: {user.user_id})")
+        logger.warning(f"Access denied: {name} (ID: {user.user_id})")
 
         # 🛑 Нет доступа
         await event.bot.send_message(
@@ -41,7 +41,7 @@ async def handle_bot_started(event: BotStarted):
 
 # Запуск процесса поллинга новых апдейтов
 async def main():
-    logger.info("Bot is run...")
+    logger.warning("Bot is run...")
     # Регистрируем роутер в диспетчере
     dp.include_routers(router)
     
@@ -56,6 +56,6 @@ async def main():
 
 if __name__ == "__main__":
     # Включаем логирование, чтобы не пропустить важные сообщения
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     asyncio.run(main())

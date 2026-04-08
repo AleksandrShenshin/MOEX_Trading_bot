@@ -176,6 +176,7 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
     finally:
         async with lock:
             shared_tasks[param_signal['ticker']]['depends'].discard(asyncio.current_task())
+        # TODO: message(log bot) о завершении задачи
 
 
 async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
@@ -246,6 +247,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     finally:
         async with lock_data_long5:
             data_tasks_long5[market]['depends'].discard(asyncio.current_task())
+        # TODO: message(log bot) о завершении задачи
 
 
 async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, chat_id):
@@ -317,7 +319,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     finally:
         async with lock_data_throws:
             data_tasks_throws[market]['depends'].discard(asyncio.current_task())
-            logger.info(f"fetch_data_throws(): Finish tasks: throws {market}")
+            logger.warning(f"fetch_data_throws(): Finish tasks: throws {market}")
             await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: throws {market}")
 
 
@@ -367,7 +369,7 @@ async def moex_infinite_loop(state: FSMContextLike):
                 curr_param_task['task'] = task
                 curr_tasks[param_signal['unique_id']] = curr_param_task.copy()
 
-                logger.info(f"moex_infinite_loop(): RUN task ID {id_signal}")
+                logger.warning(f"moex_infinite_loop(): RUN task ID {id_signal}")
                 await data['bot'].send_message(chat_id=data['chat_id'], text=f"✅ Run task ID={id_signal}")
 
         for unique_id in list(curr_tasks.keys()):

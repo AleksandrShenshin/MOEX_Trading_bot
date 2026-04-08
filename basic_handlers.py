@@ -58,6 +58,7 @@ def create_main_menu():
     return Attachment(type="inline_keyboard", payload=buttons_payload)
 
 
+# TODO: добавить stop команду
 # Хэндлер на команду /start
 @router.message_created(Command("start"))
 async def cmd_start(event: MessageCreated):
