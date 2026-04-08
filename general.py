@@ -294,7 +294,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                                                                                       }
                 asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
 
-        len_throws_step = 20
+        len_throws_step = 40    # TODO: перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
         while True:
             async with lock_data_throws:
                 upd_data_throws = copy.deepcopy(data_tasks_throws[market]['tickers'])
