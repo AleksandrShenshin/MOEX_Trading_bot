@@ -289,7 +289,8 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                                                                                                  'low': None,
                                                                                                  'open': None,
                                                                                                  'close': None,
-                                                                                                 'time_received': None}
+                                                                                                 'time_received': None,
+                                                                                                 'time_send_msg': datetime.now(timezone.utc)}
                                                                                       }
                 asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
 
@@ -298,17 +299,25 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
             async with lock_data_throws:
                 upd_data_throws = copy.deepcopy(data_tasks_throws[market]['tickers'])
             # TODO: если time_received не обновляется в течении 5 мин, то что-то сломалось в tinv
-            for param_ticker in upd_data_throws.values():
+            for figi_ticker, param_ticker in upd_data_throws.items():
                 if param_ticker['candle']['high'] == None or param_ticker['candle']['low'] == None \
                     or param_ticker['candle']['open'] == None or param_ticker['candle']['close'] == None:
                     continue
 
                 # поиск пробросов осуществляется анализом длины теней свечи в пунктах движения
                 # asd // cor — сколько шагов длины cor помещается в asd
+                trend = ""
                 len_high_step = Decimal.from_float(param_ticker['candle']['high'] - max(param_ticker['candle']['open'], param_ticker['candle']['close'])) // param_ticker['precision']
                 len_low_step = Decimal.from_float(min(param_ticker['candle']['open'], param_ticker['candle']['close']) - param_ticker['candle']['low']) // param_ticker['precision']
-                if len_high_step >= len_throws_step or len_low_step >= len_throws_step:
-                    await bot.send_message(chat_id=chat_id, text=f"🥊 Проброс {param_ticker['ticker']} {max(len_high_step, len_low_step)}п")
+                if len_high_step >= len_throws_step:
+                    trend += "high "
+                if len_low_step >= len_throws_step:
+                    trend += "low "
+                if (len_high_step >= len_throws_step or len_low_step >= len_throws_step) and (param_ticker['candle']['time_received'] != param_ticker['candle']['time_send_msg']):
+                    await bot.send_message(chat_id=chat_id, text=f"🥊 Проброс {param_ticker['ticker']} {trend}{max(len_high_step, len_low_step)}п")
+                    logger.warning(f"THROWS: {param_ticker['ticker']}: len_high_step={len_high_step}, len_low_step={len_low_step}: {param_ticker['candle']['time_received']}")
+                    async with lock_data_throws:
+                        data_tasks_throws[market]['tickers'][figi_ticker]['candle']['time_send_msg'] = param_ticker['candle']['time_received']
 
             await asyncio.sleep(3)
     except asyncio.CancelledError:

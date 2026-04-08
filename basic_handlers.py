@@ -59,6 +59,7 @@ def create_main_menu():
 
 
 # TODO: добавить stop команду
+# TODO: контроль размера log файла (при /start удалить log.txt)
 # Хэндлер на команду /start
 @router.message_created(Command("start"))
 async def cmd_start(event: MessageCreated):
