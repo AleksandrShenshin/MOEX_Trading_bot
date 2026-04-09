@@ -234,6 +234,10 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                     if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average * coefficient_multiplication_atr):
                         if ((ticker_param['cur_atr']['time_received'] - time_send_msg) > timedelta(minutes=5)) or \
                             ((ticker_param['cur_atr']['time_received'].minute // 5) != prev_bin): # Проверка перехода между 5 мин
+                            logger.warning(f"Long5: cur_atr_high={ticker_param['cur_atr']['high']}, "
+                                           f"cur_atr_low={ticker_param['cur_atr']['low']}, "
+                                           f"cur_atr_time_received={ticker_param['cur_atr']['time_received']}, "
+                                           f"average={average}, time_send_msg={time_send_msg}, prev_bin={prev_bin}")
                             time_send_msg = ticker_param['cur_atr']['time_received']
                             prev_bin = (ticker_param['cur_atr']['time_received'].minute // 5)
                             msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
