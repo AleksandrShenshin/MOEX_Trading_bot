@@ -197,6 +197,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 list_tickers.append(ret_val['current_ticker'])
             else:
                 return
+            await asyncio.sleep(0.5)
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
         list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
@@ -219,6 +220,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                                                                                  'low': None,
                                                                                                  'time_received': None}
                                                                                      }
+                    await asyncio.sleep(0.5)
                 asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
 
         time_send_msg = datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc)
@@ -273,6 +275,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                 list_tickers.append(ret_val['current_ticker'])
             else:
                 return
+            await asyncio.sleep(0.5)
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
         list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
@@ -298,6 +301,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                                                                                                  'time_received': None,
                                                                                                  'time_send_msg': datetime.now(timezone.utc)}
                                                                                       }
+                    await asyncio.sleep(0.5)
                 asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
 
         len_throws_step = 40    # TODO: перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
