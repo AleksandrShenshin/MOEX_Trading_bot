@@ -176,7 +176,8 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
     finally:
         async with lock:
             shared_tasks[param_signal['ticker']]['depends'].discard(asyncio.current_task())
-        # TODO: message(log bot) о завершении задачи
+        logger.warning(f"fetch_data_ticker(): Finish task: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
+        await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
 
 
 async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
@@ -251,7 +252,8 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     finally:
         async with lock_data_long5:
             data_tasks_long5[market]['depends'].discard(asyncio.current_task())
-        # TODO: message(log bot) о завершении задачи
+        logger.warning(f"fetch_data_long5(): Finish task: long5 {market}")
+        await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: long5 {market}")
 
 
 async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, chat_id):
@@ -332,7 +334,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     finally:
         async with lock_data_throws:
             data_tasks_throws[market]['depends'].discard(asyncio.current_task())
-            logger.warning(f"fetch_data_throws(): Finish tasks: throws {market}")
+            logger.warning(f"fetch_data_throws(): Finish task: throws {market}")
             await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: throws {market}")
 
 
