@@ -171,7 +171,7 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        print(f"fetch_data_ticker(): ERROR: {type(e).__name__}: {e}", flush=True)
+        logger.warning(f"fetch_data_ticker(): ERROR: {type(e).__name__}: {e}")
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: {param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']}")
     finally:
         async with lock:
@@ -202,6 +202,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
         list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
 
+    time_send_long5 = {}
     try:
         async with lock_data_long5:
             if market not in list(data_tasks_long5.keys()):
@@ -220,11 +221,12 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                                                                                  'low': None,
                                                                                                  'time_received': None}
                                                                                      }
+                        time_send_long5[ticker_param['figi']] = {'time_send_msg': datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc),
+                                                                 'prev_bin': -1
+                                                                 }
                     await asyncio.sleep(0.5)
                 asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
 
-        time_send_msg = datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc)
-        prev_bin = -1
         while True:
             async with lock_data_long5:
                 upd_data_long5 = copy.deepcopy(data_tasks_long5[market]['tickers'])
@@ -235,21 +237,21 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 else:
                     average = sum(ticker_param['atr']) / len(ticker_param['atr'])
                     if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average * coefficient_multiplication_atr):
-                        if ((ticker_param['cur_atr']['time_received'] - time_send_msg) > timedelta(minutes=5)) or \
-                            ((ticker_param['cur_atr']['time_received'].minute // 5) != prev_bin): # Проверка перехода между 5 мин
-                            logger.warning(f"Long5: cur_atr_high={ticker_param['cur_atr']['high']}, "
+                        if ((ticker_param['cur_atr']['time_received'] - time_send_long5[figi]['time_send_msg']) > timedelta(minutes=5)) or \
+                            ((ticker_param['cur_atr']['time_received'].minute // 5) != time_send_long5[figi]['prev_bin']): # Проверка перехода между 5 мин
+                            logger.warning(f"Long5: {ticker_param['ticker']}: cur_atr_high={ticker_param['cur_atr']['high']}, "
                                            f"cur_atr_low={ticker_param['cur_atr']['low']}, "
                                            f"cur_atr_time_received={ticker_param['cur_atr']['time_received']}, "
-                                           f"average={average}, time_send_msg={time_send_msg}, prev_bin={prev_bin}")
-                            time_send_msg = ticker_param['cur_atr']['time_received']
-                            prev_bin = (ticker_param['cur_atr']['time_received'].minute // 5)
+                                           f"average={average}, time_send_msg={time_send_long5[figi]['time_send_msg']}, prev_bin={time_send_long5[figi]['prev_bin']}")
+                            time_send_long5[figi]['time_send_msg'] = ticker_param['cur_atr']['time_received']
+                            time_send_long5[figi]['prev_bin'] = (ticker_param['cur_atr']['time_received'].minute // 5)
                             msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
                             await bot.send_message(chat_id=chat_id, text=msg_to_print)
             await asyncio.sleep(2)
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        print(f"fetch_data_long5(): ERROR: {type(e).__name__}: {e}", flush=True)
+        logger.warning(f"fetch_data_long5(): ERROR: {type(e).__name__}: {e}")
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
     finally:
         async with lock_data_long5:
