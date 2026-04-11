@@ -370,6 +370,11 @@ async def moex_infinite_loop(state: FSMContextLike):
             for param_curr_tasks in curr_tasks.values():
                 msg_to_print += f"{param_curr_tasks['id']}\n"
             await data['bot'].send_message(chat_id=data['chat_id'], text=msg_to_print)
+        elif debug_param == "hard_stop_loop":
+            # Ожидаем корректного завершения задач
+            if len(curr_tasks) == 0:
+                logger.warning(f"Finished moex_infinite_loop()")
+                return
 
         list_unique_id = []
 

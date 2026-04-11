@@ -58,8 +58,9 @@ def create_main_menu():
     return Attachment(type="inline_keyboard", payload=buttons_payload)
 
 
-# TODO: добавить stop команду
+# TODO: добавить команду DEBUG INFO ID ON/OFF, проверить что данные обновляются
 # TODO: контроль размера log файла (при /start удалить log.txt)
+# TODO: перед исполнением команд добавить проверку user_id
 # Хэндлер на команду /start
 @router.message_created(Command("start"))
 async def cmd_start(event: MessageCreated):
@@ -104,10 +105,50 @@ async def cmd_start(event: MessageCreated):
         os._exit(-1)
 
     # Start the infinite loop as a background task
-    asyncio.create_task(moex_infinite_loop(state))
+    task = asyncio.create_task(moex_infinite_loop(state))
+    lock_state.acquire()
+    await state.update_data(task_loop=task)
+    lock_state.release()
 
     menu_buttons = create_main_menu()
     await event.message.answer("MOEX Trading Bot is running", attachments=[menu_buttons])
+
+
+@router.message_created(Command("stop"))
+async def cmd_stop(event: MessageCreated):
+    user_id = event.from_user.user_id
+    state = FSMContextLike(storage, user_id)
+    if str(user_id) != config('MAX_USER_ID'):
+        await event.message.answer(
+            "❌ Доступ запрещён!\n\n"
+               "Этот бот доступен только для авторизованных пользователей.",
+        )
+        return
+
+    await event.message.answer(f"🚸 Процесс остановки Бота...")
+
+    lock_state.acquire()
+    data = await state.get_data()
+    await state.update_data(signals={})
+    lock_state.release()
+
+    try:
+        task_loop = data['task_loop']
+    except KeyError:
+        logger.error(f"ERROR: Command STOP: task_loop not found!")
+        await event.message.answer(f"⛔ ОШИБКА остановки Бота: task_loop не найден!")
+        return
+
+    while True:
+        if task_loop.done():
+            break
+        else:
+            lock_state.acquire()
+            await state.update_data(debug="hard_stop_loop")
+            lock_state.release()
+        await asyncio.sleep(1)
+
+    await event.message.answer(f"⛔ Бот остановлен...")
 
 
 @router.message_created(Command('menu'))
@@ -236,6 +277,11 @@ async def state_clear_soft(state):
         supp_tools = {}
 
     try:
+        task_loop = data['task_loop']
+    except KeyError:
+        task_loop = None
+
+    try:
         signals = data['signals']
     except KeyError:
         signals = {}
@@ -257,6 +303,7 @@ async def state_clear_soft(state):
 
     await state.clear()
     await state.update_data(supp_tools=supp_tools)
+    await state.update_data(task_loop=task_loop)
     await state.update_data(signals=signals)
     await state.update_data(chat_id=chat_id)
     await state.update_data(debug=debug)
