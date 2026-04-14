@@ -198,7 +198,8 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'ticker': '', 'prev_bin': -1,
     #                                                 'cur_atr': {'high': None, 'low': None, 'time_received': None}},
     #                                          figi: {}},
-    #                              'depends': None}
+    #                              'depends': None,
+    #                              'task_stream': None}
 
     coefficient_multiplication_atr = 2.5
     if market == 'forts':
@@ -219,7 +220,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     try:
         async with lock_data_long5:
             if market not in list(data_tasks_long5.keys()):
-                data_tasks_long5[market] = {'tickers': {}, 'depends': set()}
+                data_tasks_long5[market] = {'tickers': {}, 'depends': set(), 'task_stream': None}
                 data_tasks_long5[market]['depends'].add(asyncio.current_task())
                 for ticker in list_tickers:
                     status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
@@ -238,11 +239,15 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                                                  'prev_bin': -1
                                                                  }
                     await asyncio.sleep(0.5)
-                asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
+                data_tasks_long5[market]['task_stream'] = asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
 
         while True:
             async with lock_data_long5:
                 upd_data_long5 = copy.deepcopy(data_tasks_long5[market]['tickers'])
+                if data_tasks_long5[market]['task_stream'].done():
+                    await asyncio.sleep(5)
+                    data_tasks_long5[market]['task_stream'] = asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
+                    logger.warning(f"RESTART fetch_data_long5(): stream_list_figi_five_minute()")
             # TODO: если time_received не обновляется в течении 15 мин, то что-то сломалось в tinv
             for figi, ticker_param in upd_data_long5.items():
                 if len(ticker_param['atr']) < 5:
@@ -264,7 +269,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        logger.warning(f"fetch_data_long5(): ERROR: {type(e).__name__}: {e}")
+        logger.error(f"fetch_data_long5({market}): ERROR: {type(e).__name__}: {e}")
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
     finally:
         async with lock_data_long5:
