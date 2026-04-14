@@ -284,7 +284,8 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     #                                                  'precision': '',
     #                                                  'candle': {'high': None, 'low': None, 'open': None, 'close': None, 'time_received': None}},
     #                                           figi: {}},
-    #                               'depends': None}
+    #                               'depends': None,
+    #                               'task_stream': None}
 
     if market == 'forts':
         list_tickers = []
@@ -303,7 +304,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     try:
         async with lock_data_throws:
             if market not in list(data_tasks_throws.keys()):
-                data_tasks_throws[market] = {'tickers': {}, 'depends': set()}
+                data_tasks_throws[market] = {'tickers': {}, 'depends': set(), 'task_stream': None}
                 data_tasks_throws[market]['depends'].add(asyncio.current_task())
                 for ticker in list_tickers:
                     status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
@@ -322,12 +323,16 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                                                                                                  'time_send_msg': datetime.now(timezone.utc)}
                                                                                       }
                     await asyncio.sleep(0.5)
-                asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
+                data_tasks_throws[market]['task_stream'] = asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
 
         len_throws_step = 40    # TODO: перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
         while True:
             async with lock_data_throws:
                 upd_data_throws = copy.deepcopy(data_tasks_throws[market]['tickers'])
+                if data_tasks_throws[market]['task_stream'].done():
+                    await asyncio.sleep(5)
+                    data_tasks_throws[market]['task_stream'] = asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
+                    logger.warning(f"RESTART fetch_data_throws(): stream_get_last_5sec_candle()")
             # TODO: если time_received не обновляется в течении 5 мин, то что-то сломалось в tinv
             for figi_ticker, param_ticker in upd_data_throws.items():
                 if param_ticker['candle']['high'] == None or param_ticker['candle']['low'] == None \
