@@ -98,6 +98,7 @@ async def update_current_ticker(state):
 
 async def task_upd_curr_ticker(state):
     global lock_state
+    # TODO: в 23:55 снимать все задачи, в 7:00 запускать заново
     while True:
         ret_val, err_msg = await update_current_ticker(state)
         if ret_val:
@@ -115,21 +116,22 @@ async def task_upd_curr_ticker(state):
 
 
 async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
+    # shared_tasks = {'SiM6': {'figi': '', 'high': None, 'low': None, 'volume': None,
+    #                          'time_received': None, 'depends': None, 'task_stream': None}}
+
     fl_init_curr_pos = False
     fl_pos_high = False
-    fl_run_stream = False
     try:
         async with lock:
             if param_signal['ticker'] not in list(shared_tasks.keys()):
                 new_task_sign = {'figi': param_signal['figi'], 'high': None, 'low': None, 'volume': None,
-                                 'time_received': None, 'depends': None}
+                                 'time_received': None, 'depends': None, 'task_stream': None}
                 new_task_sign['depends'] = set()
+                new_task_sign['task_stream'] = asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
                 shared_tasks[param_signal['ticker']] = new_task_sign.copy()
-                fl_run_stream = True
             shared_tasks[param_signal['ticker']]['depends'].add(asyncio.current_task())
-        if fl_run_stream:
-            asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
 
+        fl_restart_stream = False
         time_send_msg = datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc)
         while True:
             async with lock:
@@ -138,6 +140,17 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
                 candle_volume = shared_tasks[param_signal['ticker']]['volume']
                 candle_time_received = shared_tasks[param_signal['ticker']]['time_received']
                 # TODO: если time_received не обновляется в течении 3 мин, то что-то сломалось в tinv
+
+                if shared_tasks[param_signal['ticker']]['task_stream'].done():
+                    # Если поток получения данных был прерван (например со стороны брокера) - то перезапускаем
+                    fl_restart_stream = True
+
+            if fl_restart_stream:
+                fl_restart_stream = False
+                await asyncio.sleep(5)
+                async with lock:
+                    shared_tasks[param_signal['ticker']]['task_stream'] = asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
+                logger.warning(f"RESTART fetch_data_ticker(): stream_ticker_one_minute()")
 
             if candle_high == None or candle_low == None or candle_volume == None:
                 await asyncio.sleep(3)
