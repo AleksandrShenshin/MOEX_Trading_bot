@@ -131,7 +131,6 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
                 shared_tasks[param_signal['ticker']] = new_task_sign.copy()
             shared_tasks[param_signal['ticker']]['depends'].add(asyncio.current_task())
 
-        fl_restart_stream = False
         time_send_msg = datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc)
         while True:
             async with lock:
@@ -143,14 +142,9 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
 
                 if shared_tasks[param_signal['ticker']]['task_stream'].done():
                     # Если поток получения данных был прерван (например со стороны брокера) - то перезапускаем
-                    fl_restart_stream = True
-
-            if fl_restart_stream:
-                fl_restart_stream = False
-                await asyncio.sleep(5)
-                async with lock:
+                    await asyncio.sleep(5)
                     shared_tasks[param_signal['ticker']]['task_stream'] = asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
-                logger.warning(f"RESTART fetch_data_ticker(): stream_ticker_one_minute()")
+                    logger.warning(f"RESTART fetch_data_ticker(): stream_ticker_one_minute({param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']})")
 
             if candle_high == None or candle_low == None or candle_volume == None:
                 await asyncio.sleep(3)
