@@ -217,7 +217,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 data_tasks_long5[market] = {'tickers': {}, 'depends': set(), 'task_stream': None}
                 data_tasks_long5[market]['depends'].add(asyncio.current_task())
                 for ticker in list_tickers:
-                    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
+                    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker, market)
                     if status:
                         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: long5 {market} получение параметров {ticker}: {err_mess}")
                         return
@@ -301,7 +301,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                 data_tasks_throws[market] = {'tickers': {}, 'depends': set(), 'task_stream': None}
                 data_tasks_throws[market]['depends'].add(asyncio.current_task())
                 for ticker in list_tickers:
-                    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
+                    status, ticker_param, err_mess = await tinv.get_param_instrument(ticker, market)
                     if status:
                         logger.error(f"ERROR: fetch_data_throws(): throws {market}: get parameters {ticker}: {err_mess}")
                         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: throws {market}: получение параметров {ticker}: {err_mess}")
