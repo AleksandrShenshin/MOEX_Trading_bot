@@ -241,7 +241,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 if data_tasks_long5[market]['task_stream'].done():
                     await asyncio.sleep(5)
                     data_tasks_long5[market]['task_stream'] = asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
-                    logger.warning(f"RESTART fetch_data_long5(): stream_list_figi_five_minute()")
+                    logger.warning(f"RESTART fetch_data_long5(): stream_list_figi_five_minute({market})")
             # TODO: если time_received не обновляется в течении 15 мин, то что-то сломалось в tinv
             for figi, ticker_param in upd_data_long5.items():
                 if len(ticker_param['atr']) < 5:
