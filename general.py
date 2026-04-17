@@ -259,6 +259,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                             time_send_long5[figi]['prev_bin'] = (ticker_param['cur_atr']['time_received'].minute // 5)
                             msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
                             await bot.send_message(chat_id=chat_id, text=msg_to_print)
+                            # TODO: long5 SR-6.26(SRM6) forts
             await asyncio.sleep(2)
     except asyncio.CancelledError:
         pass
@@ -342,6 +343,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                     trend += "high "
                 if len_low_step >= len_throws_step:
                     trend += "low "
+                # TODO: Проброс Si-6.26(SiM6) low 44п
                 if (len_high_step >= len_throws_step or len_low_step >= len_throws_step) and (param_ticker['candle']['time_received'] != param_ticker['candle']['time_send_msg']):
                     await bot.send_message(chat_id=chat_id, text=f"🥊 Проброс {param_ticker['ticker']} {trend}{max(len_high_step, len_low_step)}п")
                     logger.warning(f"THROWS: {param_ticker['ticker']}: len_high_step={len_high_step}, len_low_step={len_low_step}: {param_ticker['candle']['time_received']}")
@@ -392,6 +394,42 @@ async def moex_infinite_loop(state: FSMContextLike):
             if len(curr_tasks) == 0:
                 logger.warning(f"Finished moex_infinite_loop()")
                 return
+        elif debug_param is not None and debug_param.split(maxsplit=1)[0] == "info":
+            try:
+                debug_id = debug_param.split()[1]
+                # Поиск task относящейся к заданному ID
+                for param_task in curr_tasks.values():
+                    if debug_id == param_task['id']:
+                        debug_task = param_task['task']
+                        break
+                else:
+                    debug_task = None
+
+                # Определяем по task в каком массиве данных наш ID
+                if debug_task is not None:
+                    async with lock_data_tasks:
+                        for tckr, tckr_param in shared_tasks.items():
+                            if debug_task in tckr_param['depends']:
+                                # TODO: массив найден
+                                debug_task = None
+                                break
+                if debug_task is not None:
+                    async with lock_data_long5:
+                        for mrkt, mrkt_param in data_tasks_long5.items():
+                            if debug_task in mrkt_param['depends']:
+                                # TODO: массив найден
+                                debug_task = None
+                                break
+                if debug_task is not None:
+                    async with lock_data_throws:
+                        for mrkt, mrkt_param in data_tasks_throws.items():
+                            if debug_task in mrkt_param['depends']:
+                                # TODO: массив найден
+                                debug_task = None
+                                break
+            except Exception as e:
+                logger.error(f"ERROR '/debug': {e}")
+                await data['bot'].send_message(chat_id=data['chat_id'], text=f"❌ ERROR: /debug: {e}")
 
         list_unique_id = []
 
