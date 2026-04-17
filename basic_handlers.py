@@ -58,7 +58,6 @@ def create_main_menu():
     return Attachment(type="inline_keyboard", payload=buttons_payload)
 
 
-# TODO: добавить команду DEBUG INFO ID ON/OFF, проверить что данные обновляются
 # TODO: контроль размера log файла (при /start удалить log.txt)
 # TODO: перед исполнением команд добавить проверку user_id
 # Хэндлер на команду /start
@@ -668,18 +667,23 @@ async def debug_console(event: MessageCreated):
     state = FSMContextLike(storage, event.from_user.user_id)
 
     full_text = (event.message.body.text or "").strip()
-    parts = full_text.split(maxsplit=1)
+    parts = full_text.split()
     command_args = parts[1] if len(parts) > 1 else ""
-    if not command_args or len(command_args.split()) != 1:
-        await event.message.answer(f"❌ Использование: /debug PARAM")
-        return
 
-    if command_args == "get_tasks":
+    if command_args == "get_tasks" and len(parts) == 2:
         lock_state.acquire()
         await state.update_data(debug="get_tasks")
         lock_state.release()
+    elif command_args == "info" and len(parts) == 4:
+        lock_state.acquire()
+        all_data = await state.get_data()       # TODO:
+        # TODO: проверить наличие сигнала с заданным ID
+        # for id_signal, param_signal in all_data['signals'].items():
+        # TODO: что последний параметр == 'on', 'off'
+        await state.update_data(debug=full_text.split(maxsplit=1)[1])
+        lock_state.release()
     else:
-        await event.message.answer(f"❌ ERROR: значение {command_args} не корректно.")
+        await event.message.answer(f"❌ ERROR: /debug не корректный параметр.")
         return
 
 
