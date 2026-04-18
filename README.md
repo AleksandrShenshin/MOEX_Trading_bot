@@ -13,11 +13,11 @@
 > - **T_TOKEN** = 8298363621:AAGKkemhznX0JmbzrIHnjrtaxjTTbFOYLX0 (указываем токен T invest)  
 > - **FUTURES_LIST** = si, cr (список поддерживаемых фьючерсов)  
 В списке указываются первые две буквы тикера (неизменны при смене контракта) через ',' 
-> - **TYPES_SIGNAL** = _{'Price': {'param': '-p'}, 'Volume': {'param': '-v'}, 'Long5': {'param': '-c'}}_  
+> - **TYPES_SIGNAL** = _{'Price': {'param': '-p'}, 'Volume': {'param': '-v'}, 'Long5': {'param': '-c'}, 'Throws': {'param': '-t'}}_  
 (список поддерживаемых сигналов)  
 Формат  
-_Price, Volume, Long5_ - название которое будет видно в боте  
-_param_ - -p - price, -v - volume, -c - long5  
+_Price, Volume, Long5, Throws_ - название которое будет видно в боте  
+_param_ - -p - price, -v - volume, -c - long5, -t - trows  
 > - **CANDLE_FORTS** = BR, GD, SV, NG, MX, Si, BM, CR, RI, FF, SF, MM 	
 > - **CANDLE_MOEX** = SBER, VTBR, GAZP, GMKN, OZON, SMLT, YDEX, LKOH  
 
@@ -39,7 +39,7 @@ _param_ - -p - price, -v - volume, -c - long5
         VALUE: значение целое или дробное  
 /long5 forts/moex  
 /get_list_ticker - поддерживаемые тикеры  
-/debug PARAM  
-PARAM может принимать следующие значения:  
-        get_tasks - получить id опрашиваемых сигналов  
+/debug get_tasks - получить id опрашиваемых сигналов  
+/debug info id on/off - вывести данные по задачи в бот  
+
 <<<<<

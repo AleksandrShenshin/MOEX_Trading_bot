@@ -58,7 +58,6 @@ def create_main_menu():
     return Attachment(type="inline_keyboard", payload=buttons_payload)
 
 
-# TODO: добавить команду DEBUG INFO ID ON/OFF, проверить что данные обновляются
 # TODO: контроль размера log файла (при /start удалить log.txt)
 # TODO: перед исполнением команд добавить проверку user_id
 # Хэндлер на команду /start
@@ -519,6 +518,10 @@ async def add_signal(message, state, ticker, type_signal, value):
             await message.answer(f"❌ ERROR: add_signal(): get 'supp_tools' except KeyError {e}")
             return
 
+        # TODO: определить к какой площадке относится тикер и передавать в параметре
+        # /set sber -p 324.4 -- NOT_FOUND 50002 x3
+        # /set srm6 -p 33350 -- NOT_FOUND 50002 x2
+        # /set si -p 76250   -- x0
         status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
         if status:
             await message.answer(f"❌ ERROR: записи сигнала в файл: {err_mess}")
@@ -668,18 +671,32 @@ async def debug_console(event: MessageCreated):
     state = FSMContextLike(storage, event.from_user.user_id)
 
     full_text = (event.message.body.text or "").strip()
-    parts = full_text.split(maxsplit=1)
+    parts = full_text.split()
     command_args = parts[1] if len(parts) > 1 else ""
-    if not command_args or len(command_args.split()) != 1:
-        await event.message.answer(f"❌ Использование: /debug PARAM")
-        return
 
-    if command_args == "get_tasks":
+    if command_args == "get_tasks" and len(parts) == 2:
         lock_state.acquire()
         await state.update_data(debug="get_tasks")
         lock_state.release()
+    elif command_args == "info" and len(parts) == 4:
+        lock_state.acquire()
+        all_data = await state.get_data()
+        lock_state.release()
+
+        list_id = list(all_data['signals'])
+        if parts[2] not in list_id:
+            await event.message.answer(f"❌ ERROR: {full_text}: ID={parts[2]} не существует")
+            return
+
+        if parts[3] != "on" and parts[3] != "off":
+            await event.message.answer(f"❌ ERROR: {full_text}: on/off не корректно")
+            return
+
+        lock_state.acquire()
+        await state.update_data(debug=full_text.split(maxsplit=1)[1])
+        lock_state.release()
     else:
-        await event.message.answer(f"❌ ERROR: значение {command_args} не корректно.")
+        await event.message.answer(f"❌ ERROR: /debug не корректный параметр.")
         return
 
 

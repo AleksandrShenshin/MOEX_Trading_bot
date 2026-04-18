@@ -117,7 +117,8 @@ async def task_upd_curr_ticker(state):
 
 async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
     # shared_tasks = {'SiM6': {'figi': '', 'high': None, 'low': None, 'volume': None,
-    #                          'time_received': None, 'depends': None, 'task_stream': None}}
+    #                          'time_received': None, 'depends': None, 'task_stream': None,
+    #                          'debug_info': 'off', 'debug_info_task': None}}
 
     fl_init_curr_pos = False
     fl_pos_high = False
@@ -125,7 +126,8 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
         async with lock:
             if param_signal['ticker'] not in list(shared_tasks.keys()):
                 new_task_sign = {'figi': param_signal['figi'], 'high': None, 'low': None, 'volume': None,
-                                 'time_received': None, 'depends': None, 'task_stream': None}
+                                 'time_received': None, 'depends': None, 'task_stream': None,
+                                 'debug_info': 'off', 'debug_info_task': None}
                 new_task_sign['depends'] = set()
                 new_task_sign['task_stream'] = asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
                 shared_tasks[param_signal['ticker']] = new_task_sign.copy()
@@ -138,6 +140,8 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
                 candle_low = shared_tasks[param_signal['ticker']]['low']
                 candle_volume = shared_tasks[param_signal['ticker']]['volume']
                 candle_time_received = shared_tasks[param_signal['ticker']]['time_received']
+                debug_info = shared_tasks[param_signal['ticker']]['debug_info']
+                debug_info_task = shared_tasks[param_signal['ticker']]['debug_info_task']
                 # TODO: если time_received не обновляется в течении 3 мин, то что-то сломалось в tinv
 
                 if shared_tasks[param_signal['ticker']]['task_stream'].done():
@@ -174,6 +178,13 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
                     await bot.send_message(chat_id=chat_id, text=msg_to_print)
                     break
 
+            if debug_info == 'on' and debug_info_task == asyncio.current_task():
+                msg_to_print = f"DEBUG INFO {param_signal['ticker']} {param_signal['type_signal']}: " \
+                               f"high={candle_high}, low={candle_low}, volume={candle_volume}, " \
+                               f"time_received={candle_time_received}"
+                logger.warning(msg_to_print)
+                await bot.send_message(chat_id=chat_id, text=msg_to_print)
+
             await asyncio.sleep(2)
     except asyncio.CancelledError:
         pass
@@ -193,7 +204,8 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     #                                                 'cur_atr': {'high': None, 'low': None, 'time_received': None}},
     #                                          figi: {}},
     #                              'depends': None,
-    #                              'task_stream': None}
+    #                              'task_stream': None
+    #                              'debug_info': 'off'}
 
     coefficient_multiplication_atr = 2.5
     if market == 'forts':
@@ -214,7 +226,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     try:
         async with lock_data_long5:
             if market not in list(data_tasks_long5.keys()):
-                data_tasks_long5[market] = {'tickers': {}, 'depends': set(), 'task_stream': None}
+                data_tasks_long5[market] = {'tickers': {}, 'depends': set(), 'task_stream': None, 'debug_info': 'off'}
                 data_tasks_long5[market]['depends'].add(asyncio.current_task())
                 for ticker in list_tickers:
                     status, ticker_param, err_mess = await tinv.get_param_instrument(ticker, market)
@@ -237,6 +249,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
 
         while True:
             async with lock_data_long5:
+                debug_info = data_tasks_long5[market]['debug_info']
                 upd_data_long5 = copy.deepcopy(data_tasks_long5[market]['tickers'])
                 if data_tasks_long5[market]['task_stream'].done():
                     await asyncio.sleep(5)
@@ -259,6 +272,15 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                             time_send_long5[figi]['prev_bin'] = (ticker_param['cur_atr']['time_received'].minute // 5)
                             msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
                             await bot.send_message(chat_id=chat_id, text=msg_to_print)
+                            # TODO: long5 SR-6.26(SRM6) forts
+
+            if debug_info == 'on':
+                msg_to_print = f"DEBUG INFO Long5({market}): {ticker_param['ticker']} -- " \
+                               f"high={ticker_param['cur_atr']['high']}, low={ticker_param['cur_atr']['low']}, " \
+                               f"time_received={ticker_param['cur_atr']['time_received']}"
+                logger.warning(msg_to_print)
+                await bot.send_message(chat_id=chat_id, text=msg_to_print)
+
             await asyncio.sleep(2)
     except asyncio.CancelledError:
         pass
@@ -279,7 +301,8 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     #                                                  'candle': {'high': None, 'low': None, 'open': None, 'close': None, 'time_received': None}},
     #                                           figi: {}},
     #                               'depends': None,
-    #                               'task_stream': None}
+    #                               'task_stream': None,
+    #                               'debug_info': 'off'}
 
     if market == 'forts':
         list_tickers = []
@@ -298,7 +321,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     try:
         async with lock_data_throws:
             if market not in list(data_tasks_throws.keys()):
-                data_tasks_throws[market] = {'tickers': {}, 'depends': set(), 'task_stream': None}
+                data_tasks_throws[market] = {'tickers': {}, 'depends': set(), 'task_stream': None, 'debug_info': 'off'}
                 data_tasks_throws[market]['depends'].add(asyncio.current_task())
                 for ticker in list_tickers:
                     status, ticker_param, err_mess = await tinv.get_param_instrument(ticker, market)
@@ -322,6 +345,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
         len_throws_step = 40    # TODO: перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
         while True:
             async with lock_data_throws:
+                debug_info = data_tasks_throws[market]['debug_info']
                 upd_data_throws = copy.deepcopy(data_tasks_throws[market]['tickers'])
                 if data_tasks_throws[market]['task_stream'].done():
                     await asyncio.sleep(5)
@@ -342,11 +366,19 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                     trend += "high "
                 if len_low_step >= len_throws_step:
                     trend += "low "
+                # TODO: Проброс Si-6.26(SiM6) low 44п
                 if (len_high_step >= len_throws_step or len_low_step >= len_throws_step) and (param_ticker['candle']['time_received'] != param_ticker['candle']['time_send_msg']):
                     await bot.send_message(chat_id=chat_id, text=f"🥊 Проброс {param_ticker['ticker']} {trend}{max(len_high_step, len_low_step)}п")
                     logger.warning(f"THROWS: {param_ticker['ticker']}: len_high_step={len_high_step}, len_low_step={len_low_step}: {param_ticker['candle']['time_received']}")
                     async with lock_data_throws:
                         data_tasks_throws[market]['tickers'][figi_ticker]['candle']['time_send_msg'] = param_ticker['candle']['time_received']
+
+            if debug_info == 'on':
+                msg_to_print = f"DEBUG INFO Throws({market}): {param_ticker['ticker']} " \
+                               f"high={param_ticker['candle']['high']}, low={param_ticker['candle']['low']}, " \
+                               f"time_received={param_ticker['candle']['time_received']}"
+                logger.warning(msg_to_print)
+                await bot.send_message(chat_id=chat_id, text=msg_to_print)
 
             await asyncio.sleep(3)
     except asyncio.CancelledError:
@@ -392,6 +424,43 @@ async def moex_infinite_loop(state: FSMContextLike):
             if len(curr_tasks) == 0:
                 logger.warning(f"Finished moex_infinite_loop()")
                 return
+        elif debug_param is not None and debug_param.split(maxsplit=1)[0] == "info":
+            try:
+                debug_id = debug_param.split()[1]
+                # Поиск task относящейся к заданному ID
+                for param_task in curr_tasks.values():
+                    if debug_id == param_task['id']:
+                        debug_task = param_task['task']
+                        break
+                else:
+                    debug_task = None
+
+                # Определяем по task в каком массиве данных наш ID
+                if debug_task is not None:
+                    async with lock_data_tasks:
+                        for tckr, tckr_param in shared_tasks.items():
+                            if debug_task in tckr_param['depends']:
+                                shared_tasks[tckr]['debug_info'] = debug_param.split()[2]
+                                shared_tasks[tckr]['debug_info_task'] = debug_task
+                                debug_task = None
+                                break
+                if debug_task is not None:
+                    async with lock_data_long5:
+                        for mrkt, mrkt_param in data_tasks_long5.items():
+                            if debug_task in mrkt_param['depends']:
+                                data_tasks_long5[mrkt]['debug_info'] = debug_param.split()[2]
+                                debug_task = None
+                                break
+                if debug_task is not None:
+                    async with lock_data_throws:
+                        for mrkt, mrkt_param in data_tasks_throws.items():
+                            if debug_task in mrkt_param['depends']:
+                                data_tasks_throws[mrkt]['debug_info'] = debug_param.split()[2]
+                                debug_task = None
+                                break
+            except Exception as e:
+                logger.error(f"ERROR '/debug': {e}")
+                await data['bot'].send_message(chat_id=data['chat_id'], text=f"❌ ERROR: /debug: {e}")
 
         list_unique_id = []
 
