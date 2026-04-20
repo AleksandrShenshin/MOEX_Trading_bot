@@ -518,10 +518,6 @@ async def add_signal(message, state, ticker, type_signal, value):
             await message.answer(f"❌ ERROR: add_signal(): get 'supp_tools' except KeyError {e}")
             return
 
-        # TODO: определить к какой площадке относится тикер и передавать в параметре
-        # /set sber -p 324.4 -- NOT_FOUND 50002 x3
-        # /set srm6 -p 33350 -- NOT_FOUND 50002 x2
-        # /set si -p 76250   -- x0
         status, ticker_param, err_mess = await tinv.get_param_instrument(ticker)
         if status:
             await message.answer(f"❌ ERROR: записи сигнала в файл: {err_mess}")
