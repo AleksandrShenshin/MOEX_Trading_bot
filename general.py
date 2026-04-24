@@ -297,6 +297,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
 async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, chat_id):
     # data_tasks_throws = {'forts': {},
     #                      'moex': {'tickers': {figi: {'ticker': '',
+    #                                                  'name': '',
     #                                                  'precision': '',
     #                                                  'candle': {'high': None, 'low': None, 'open': None, 'close': None, 'time_received': None}},
     #                                           figi: {}},
@@ -331,6 +332,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                         return
                     else:
                         data_tasks_throws[market]['tickers'][ticker_param['figi']] = {'ticker': ticker_param['ticker'],
+                                                                                      'name': ticker_param['name'],
                                                                                       'precision': ticker_param['precision'],
                                                                                       'candle': {'high': None,
                                                                                                  'low': None,
@@ -366,9 +368,13 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                     trend += "high "
                 if len_low_step >= len_throws_step:
                     trend += "low "
-                # TODO: Проброс Si-6.26(SiM6) low 44п
                 if (len_high_step >= len_throws_step or len_low_step >= len_throws_step) and (param_ticker['candle']['time_received'] != param_ticker['candle']['time_send_msg']):
-                    await bot.send_message(chat_id=chat_id, text=f"🥊 Проброс {param_ticker['ticker']} {trend}{max(len_high_step, len_low_step)}п")
+                    msg = ""
+                    if market == 'forts':
+                        msg = f"🥊 {param_ticker['name']} {trend}{max(len_high_step, len_low_step)}п ({param_ticker['ticker']})"
+                    elif market == 'moex':
+                        msg = f"🥊 {param_ticker['ticker']} {trend}{max(len_high_step, len_low_step)}п"
+                    await bot.send_message(chat_id=chat_id, text=msg)
                     logger.warning(f"THROWS: {param_ticker['ticker']}: len_high_step={len_high_step}, len_low_step={len_low_step}: {param_ticker['candle']['time_received']}")
                     async with lock_data_throws:
                         data_tasks_throws[market]['tickers'][figi_ticker]['candle']['time_send_msg'] = param_ticker['candle']['time_received']
