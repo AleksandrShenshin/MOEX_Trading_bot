@@ -199,8 +199,10 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
 
 async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
     # data_tasks_long5 = {'forts': {},
-    #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'ticker': '', 'name': '', 'prev_bin': -1,
-    #                                                 'cur_atr': {'high': None, 'low': None, 'time_received': None}},
+    #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'atr_volume': [EE, RR, TT, AA, UU],
+    #                                                 'ticker': '', 'name': '', 'prev_bin': -1,
+    #                                                 'cur_atr': {'high': None, 'low': None, 'volume': None,
+    #                                                             'time_received': None}},
     #                                          figi: {}},
     #                              'depends': None,
     #                              'task_stream': None
@@ -234,14 +236,17 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                         return
                     else:
                         data_tasks_long5[market]['tickers'][ticker_param['figi']] = {'atr': [],
+                                                                                     'atr_volume': [],
                                                                                      'ticker': ticker_param['ticker'],
                                                                                      'name': ticker_param['name'],
                                                                                      'prev_bin': -1,
                                                                                      'cur_atr': {'high': None,
                                                                                                  'low': None,
+                                                                                                 'volume': None,
                                                                                                  'time_received': None}
                                                                                      }
-                        time_send_long5[ticker_param['figi']] = {'time_send_msg': datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc),
+                        time_send_long5[ticker_param['figi']] = {'time_send_msg_atr': datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc),
+                                                                 'time_send_msg_vol': datetime(2026, 1, 31, 20, 42, tzinfo=timezone.utc),
                                                                  'prev_bin': -1
                                                                  }
                     await asyncio.sleep(0.5)
@@ -259,27 +264,45 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 if len(ticker_param['atr']) < 5:
                     continue
                 else:
-                    average = sum(ticker_param['atr']) / len(ticker_param['atr'])
-                    if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average * coefficient_multiplication_atr):
-                        if ((ticker_param['cur_atr']['time_received'] - time_send_long5[figi]['time_send_msg']) > timedelta(minutes=5)) or \
+                    average_atr = sum(ticker_param['atr']) / len(ticker_param['atr'])
+                    average_vol = sum(ticker_param['atr_volume']) / len(ticker_param['atr_volume'])
+                    if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average_atr * coefficient_multiplication_atr):
+                        if ((ticker_param['cur_atr']['time_received'] - time_send_long5[figi]['time_send_msg_atr']) > timedelta(minutes=5)) or \
                             ((ticker_param['cur_atr']['time_received'].minute // 5) != time_send_long5[figi]['prev_bin']): # Проверка перехода между 5 мин
-                            logger.warning(f"Long5: {ticker_param['ticker']}: cur_atr_high={ticker_param['cur_atr']['high']}, "
-                                           f"cur_atr_low={ticker_param['cur_atr']['low']}, "
-                                           f"cur_atr_time_received={ticker_param['cur_atr']['time_received']}, "
-                                           f"average={average}, time_send_msg={time_send_long5[figi]['time_send_msg']}, prev_bin={time_send_long5[figi]['prev_bin']}")
-                            time_send_long5[figi]['time_send_msg'] = ticker_param['cur_atr']['time_received']
+                            # выполнено условия L5 - отправляем уведомление
+                            time_send_long5[figi]['time_send_msg_atr'] = ticker_param['cur_atr']['time_received']
                             time_send_long5[figi]['prev_bin'] = (ticker_param['cur_atr']['time_received'].minute // 5)
                             msg_to_print = f"🐛 L5 "
-                            if market == 'forts':
-                                msg_to_print += f"{ticker_param['name']}({ticker_param['ticker']})"
-                            elif market == 'moex':
-                                msg_to_print += ticker_param['ticker']
-                            await bot.send_message(chat_id=chat_id, text=msg_to_print)
+                            if ticker_param['cur_atr']['volume'] >= (average_vol * coefficient_multiplication_atr):
+                                time_send_long5[figi]['time_send_msg_vol'] = ticker_param['cur_atr']['time_received']
+                                msg_to_print = f"🐛🍄 L5 "
+                        elif ticker_param['cur_atr']['volume'] >= (average_vol * coefficient_multiplication_atr):
+                            if (ticker_param['cur_atr']['time_received'] - time_send_long5[figi]['time_send_msg_vol']) > timedelta(minutes=5):
+                                # если сообщение L5 было отправлено без объема (объём появился позже) - отправляем L5 с объёмом
+                                time_send_long5[figi]['time_send_msg_vol'] = ticker_param['cur_atr']['time_received']
+                                msg_to_print = f"🐛🍄 L5 "
+                            else:
+                                continue
+                        else:
+                            continue
+
+                        if market == 'forts':
+                            msg_to_print += f"{ticker_param['name']}({ticker_param['ticker']})"
+                        elif market == 'moex':
+                            msg_to_print += ticker_param['ticker']
+                        await bot.send_message(chat_id=chat_id, text=msg_to_print)
+                        logger.warning(f"Long5: {ticker_param['ticker']}: cur_atr_high={ticker_param['cur_atr']['high']}, "
+                                       f"cur_atr_low={ticker_param['cur_atr']['low']}, "
+                                       f"cur_atr_vol={ticker_param['cur_atr']['volume']}, "
+                                       f"cur_atr_time_received={ticker_param['cur_atr']['time_received']}, "
+                                       f"average_atr={average_atr}, average_vol={average_vol}, "
+                                       f"time_send_msg_atr={time_send_long5[figi]['time_send_msg_atr']}, "
+                                       f"prev_bin={time_send_long5[figi]['prev_bin']}")
 
             if debug_info == 'on':
                 msg_to_print = f"DEBUG INFO Long5({market}): {ticker_param['ticker']} -- " \
                                f"high={ticker_param['cur_atr']['high']}, low={ticker_param['cur_atr']['low']}, " \
-                               f"time_received={ticker_param['cur_atr']['time_received']}"
+                               f"volume={ticker_param['cur_atr']['volume']}, time_received={ticker_param['cur_atr']['time_received']}"
                 logger.warning(msg_to_print)
                 await bot.send_message(chat_id=chat_id, text=msg_to_print)
 
