@@ -199,7 +199,7 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
 
 async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
     # data_tasks_long5 = {'forts': {},
-    #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'ticker': '', 'prev_bin': -1,
+    #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'ticker': '', 'name': '', 'prev_bin': -1,
     #                                                 'cur_atr': {'high': None, 'low': None, 'time_received': None}},
     #                                          figi: {}},
     #                              'depends': None,
@@ -235,6 +235,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                     else:
                         data_tasks_long5[market]['tickers'][ticker_param['figi']] = {'atr': [],
                                                                                      'ticker': ticker_param['ticker'],
+                                                                                     'name': ticker_param['name'],
                                                                                      'prev_bin': -1,
                                                                                      'cur_atr': {'high': None,
                                                                                                  'low': None,
@@ -268,9 +269,12 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                            f"average={average}, time_send_msg={time_send_long5[figi]['time_send_msg']}, prev_bin={time_send_long5[figi]['prev_bin']}")
                             time_send_long5[figi]['time_send_msg'] = ticker_param['cur_atr']['time_received']
                             time_send_long5[figi]['prev_bin'] = (ticker_param['cur_atr']['time_received'].minute // 5)
-                            msg_to_print = f"🐛 long5 {ticker_param['ticker']} {market}"
+                            msg_to_print = f"🐛 L5 "
+                            if market == 'forts':
+                                msg_to_print += f"{ticker_param['name']}({ticker_param['ticker']})"
+                            elif market == 'moex':
+                                msg_to_print += ticker_param['ticker']
                             await bot.send_message(chat_id=chat_id, text=msg_to_print)
-                            # TODO: long5 SR-6.26(SRM6) forts
 
             if debug_info == 'on':
                 msg_to_print = f"DEBUG INFO Long5({market}): {ticker_param['ticker']} -- " \
