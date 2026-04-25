@@ -142,13 +142,12 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
                 candle_time_received = shared_tasks[param_signal['ticker']]['time_received']
                 debug_info = shared_tasks[param_signal['ticker']]['debug_info']
                 debug_info_task = shared_tasks[param_signal['ticker']]['debug_info_task']
-                # TODO: если time_received не обновляется в течении 3 мин, то что-то сломалось в tinv
 
                 if shared_tasks[param_signal['ticker']]['task_stream'].done():
                     # Если поток получения данных был прерван (например со стороны брокера) - то перезапускаем
                     await asyncio.sleep(5)
                     shared_tasks[param_signal['ticker']]['task_stream'] = asyncio.create_task(tinv.stream_ticker_one_minute(lock, shared_tasks, param_signal['ticker']))
-                    logger.warning(f"RESTART fetch_data_ticker(): stream_ticker_one_minute({param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']})")
+                    logger.error(f"RESTART fetch_data_ticker(): stream_ticker_one_minute({param_signal['ticker']} {param_signal['type_signal']} {param_signal['value']})")
 
             if candle_high == None or candle_low == None or candle_volume == None:
                 await asyncio.sleep(3)
@@ -254,8 +253,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 if data_tasks_long5[market]['task_stream'].done():
                     await asyncio.sleep(5)
                     data_tasks_long5[market]['task_stream'] = asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
-                    logger.warning(f"RESTART fetch_data_long5(): stream_list_figi_five_minute({market})")
-            # TODO: если time_received не обновляется в течении 15 мин, то что-то сломалось в tinv
+                    logger.error(f"RESTART fetch_data_long5(): stream_list_figi_five_minute({market})")
             for figi, ticker_param in upd_data_long5.items():
                 if len(ticker_param['atr']) < 5:
                     continue
@@ -352,8 +350,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                 if data_tasks_throws[market]['task_stream'].done():
                     await asyncio.sleep(5)
                     data_tasks_throws[market]['task_stream'] = asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
-                    logger.warning(f"RESTART fetch_data_throws(): stream_get_last_5sec_candle()")
-            # TODO: если time_received не обновляется в течении 5 мин, то что-то сломалось в tinv
+                    logger.error(f"RESTART fetch_data_throws(): stream_get_last_5sec_candle()")
             for figi_ticker, param_ticker in upd_data_throws.items():
                 if param_ticker['candle']['high'] == None or param_ticker['candle']['low'] == None \
                     or param_ticker['candle']['open'] == None or param_ticker['candle']['close'] == None:

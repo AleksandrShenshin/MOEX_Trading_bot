@@ -58,7 +58,6 @@ def create_main_menu():
     return Attachment(type="inline_keyboard", payload=buttons_payload)
 
 
-# TODO: контроль размера log файла (при /start удалить log.txt)
 # TODO: перед исполнением команд добавить проверку user_id
 # Хэндлер на команду /start
 @router.message_created(Command("start"))
