@@ -87,7 +87,7 @@ async def handle_webhook(request):
                 return web.Response(status=200)
 
             # Поиск хендлера в роутере
-            handler = basic_handlers.get_webhook_handler('message_created', text)
+            handler = basic_handlers.get_webhook_handler('message_created', text.split()[0])
             if handler:
                 await handler(event)
             else:
@@ -97,27 +97,6 @@ async def handle_webhook(request):
 
             # TODO: del
             # # Обработка команд через ваш роутер
-            # if text == '/start':
-            #     from basic_handlers import cmd_start
-            #     await cmd_start(event)
-            # elif text == '/menu':
-            #     from basic_handlers import cmd_menu
-            #     await cmd_menu(event)
-            # elif text == '/help':
-            #     from basic_handlers import cmd_help
-            #     await cmd_help(event)
-            # elif text == '/stop':
-            #     from basic_handlers import cmd_stop
-            #     await cmd_stop(event)
-            # elif text == '/get_list_ticker':
-            #     from basic_handlers import get_support_ticker
-            #     await get_support_ticker(event)
-            # elif text == '/get_signals':
-            #     from basic_handlers import get_list_signal
-            #     await get_list_signal(event)
-            # elif text.startswith('/set'):
-            #     from basic_handlers import set_console
-            #     await set_console(event)
             # elif text.startswith('/del'):
             #     from basic_handlers import del_console
             #     await del_console(event)
@@ -139,12 +118,8 @@ async def handle_webhook(request):
 
         elif update_type == 'message_callback':
             event = MessageCallback(**data)
-            # event.message.bot = bot
-
-            # # Проверка авторизации
-            # if str(user_id) != max_user_id:
-            #     await bot.send_message(chat_id=chat_id, text="❌ Доступ запрещён!")
-            #     return web.Response(status=200)
+            event.message.bot = bot
+            event.bot = bot
 
             # Обработка callback-кнопок
             payload = event.callback.payload
@@ -155,18 +130,12 @@ async def handle_webhook(request):
             else:
                 logger.warning(f"Unknown callback payload: {payload}")
 
-            # if payload == 'cmd_get_list_signal':
-            #     from basic_handlers import get_list_signal
-            #     await get_list_signal(event)
             # elif payload == 'cmd_add_signal':
             #     from basic_handlers import callback_add_signal
             #     await callback_add_signal(event)
             # elif payload == 'cmd_del_signal':
             #     from basic_handlers import callback_del_signal
             #     await callback_del_signal(event)
-            # elif payload == 'cmd_help':
-            #     from basic_handlers import cmd_help
-            #     await cmd_help(event)
             # elif payload.startswith('typesignal_'):
             #     from basic_handlers import handle_set_type_signal
             #     await handle_set_type_signal(event)

@@ -23,7 +23,8 @@ WEBHOOK_ROUTERS = {
         '/help': 'cmd_help',
         '/stop': 'cmd_stop',
         '/get_list_ticker': 'get_support_ticker',
-        '/get_signals': 'get_list_signal',
+        '/gs': 'get_list_signal',
+        '/set': 'set_console',
     },
     'message_callback': {
         'cmd_get_list_signal': 'get_list_signal',
@@ -155,10 +156,9 @@ async def cmd_start(event: MessageCreated):
     await event.message.answer("MOEX Trading Bot is running", attachments=[menu_buttons])
 
 
-# TODO: not check
 @router.message_created(Command("stop"))
 async def cmd_stop(event: MessageCreated):
-    user_id = event.from_user.user_id
+    user_id = event.message.sender.user_id
     state = FSMContextLike(storage, user_id)
     if str(user_id) != config('MAX_USER_ID'):
         await event.message.answer(
@@ -193,7 +193,6 @@ async def cmd_stop(event: MessageCreated):
     await event.message.answer(f"⛔ Бот остановлен...")
 
 
-# TODO: not check
 @router.message_created(Command('menu'))
 async def cmd_menu(event: MessageCreated):
     """Показать главное меню"""
@@ -203,7 +202,6 @@ async def cmd_menu(event: MessageCreated):
     await event.message.answer("🏠 Главное меню", attachments=[menu_buttons])
 
 
-# TODO: not check
 @router.message_created(Command("help"))
 @router.message_callback(F.callback.payload == "cmd_help")
 async def cmd_help(event: MessageCreated):
@@ -226,7 +224,6 @@ async def cmd_help(event: MessageCreated):
         await event.message.answer(readme_message)
 
 
-# TODO: not check
 @router.message_created(Command("get_list_ticker"))
 async def get_support_ticker(event: MessageCreated):
     support_ticker = ""
@@ -239,12 +236,10 @@ async def get_support_ticker(event: MessageCreated):
     await event.message.answer(support_ticker)
 
 
-# TODO: not check
-@router.message_created(Command("get_signals"))
+@router.message_created(Command("gs"))
 @router.message_callback(F.callback.payload == "cmd_get_list_signal")
 async def get_list_signal(event: MessageCreated):
-    user_id = event.from_user.user_id
-    state = FSMContextLike(storage, user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     lock_state.acquire()
     all_data = await state.get_data()
@@ -286,10 +281,9 @@ async def get_list_signal(event: MessageCreated):
         await event.message.answer(f"Нет активных сигналов")
 
 
-# TODO: not check
 @router.message_created(Command("set"))
 async def set_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split(maxsplit=1)
@@ -358,12 +352,9 @@ async def state_clear_soft(state):
     lock_state.release()
 
 
-# TODO: not check
 @router.message_callback(F.callback.payload == "cmd_add_signal")
 async def callback_add_signal(event: MessageCallback):
-    user_id = event.from_user.user_id
-    state = FSMContextLike(storage, user_id)
-
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
     await state_clear_soft(state)
 
     # Собираем кнопки: 2 в ряд, как builder.adjust(2)
@@ -397,8 +388,7 @@ async def callback_add_signal(event: MessageCallback):
 # TODO: not check
 @router.message_callback(F.callback.payload.startswith("typesignal_"))
 async def handle_set_type_signal(event: MessageCallback):
-    user_id = event.from_user.user_id
-    state = FSMContextLike(storage, user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     type_signal = event.callback.payload.split("_", 1)[1]
 
@@ -457,7 +447,7 @@ async def handle_set_type_signal(event: MessageCallback):
 # TODO: not check
 @router.message_callback(F.callback.payload.startswith("ticker_"))
 async def handle_set_ticker(event: MessageCallback):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     ticker = event.callback.payload.split("_", 1)[1]
 
@@ -516,10 +506,9 @@ async def handle_set_ticker(event: MessageCallback):
         lock_state.release()
 
 
-# TODO: not check
 @router.message_callback(F.callback.payload == "cancel_signal")
 async def handle_cancel_signal(event: MessageCallback):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
     await event.bot.delete_message(message_id=event.message.body.mid)
     await state_clear_soft(state)
 
@@ -640,7 +629,7 @@ async def form_add_signal(event, state):
 # TODO: not check
 @router.message_callback(F.callback.payload == "cmd_del_signal")
 async def callback_del_signal(event: MessageCallback):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     # Кнопка "Отмена"
     buttons = [[
@@ -697,7 +686,7 @@ async def form_del_id(event, state):
 # TODO: not check
 @router.message_created(Command("del"))
 async def del_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split(maxsplit=1)
@@ -719,7 +708,7 @@ async def del_console(event: MessageCreated):
 # TODO: not check
 @router.message_created(Command("debug"))
 async def debug_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split()
@@ -754,7 +743,7 @@ async def debug_console(event: MessageCreated):
 # TODO: not check
 @router.message_created(Command("long5"))
 async def long5_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split(maxsplit=1)
@@ -785,8 +774,8 @@ async def long5_console(event: MessageCreated):
 # TODO: not check
 @router.message_created(F.message.body.text)
 async def all_message(event: MessageCreated):
-#    state = FSMContextLike(storage, event.from_user.user_id)
-    state = FSMContextLike(storage, "198406978")                # TODO: del
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
+
     lock_state.acquire()
     curr_state = await state.get_state()
     lock_state.release()
