@@ -25,10 +25,16 @@ WEBHOOK_ROUTERS = {
         '/get_list_ticker': 'get_support_ticker',
         '/gs': 'get_list_signal',
         '/set': 'set_console',
+        '/del': 'del_console',
+        '/debug': 'debug_console',
+        '/long5': 'long5_console',
     },
     'message_callback': {
         'cmd_get_list_signal': 'get_list_signal',
         'cmd_add_signal': 'callback_add_signal',
+        'typesignal_': 'handle_set_type_signal',
+        'ticker_': 'handle_set_ticker',
+        'cancel_signal': 'handle_cancel_signal',
         'cmd_del_signal': 'callback_del_signal',
         'cmd_help': 'cmd_help',
     }
@@ -385,7 +391,6 @@ async def callback_add_signal(event: MessageCallback):
     )
 
 
-# TODO: not check
 @router.message_callback(F.callback.payload.startswith("typesignal_"))
 async def handle_set_type_signal(event: MessageCallback):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -444,7 +449,6 @@ async def handle_set_type_signal(event: MessageCallback):
     )
 
 
-# TODO: not check
 @router.message_callback(F.callback.payload.startswith("ticker_"))
 async def handle_set_ticker(event: MessageCallback):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -626,7 +630,6 @@ async def form_add_signal(event, state):
     await state_clear_soft(state)
 
 
-# TODO: not check
 @router.message_callback(F.callback.payload == "cmd_del_signal")
 async def callback_del_signal(event: MessageCallback):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -683,7 +686,6 @@ async def form_del_id(event, state):
     await state_clear_soft(state)
 
 
-# TODO: not check
 @router.message_created(Command("del"))
 async def del_console(event: MessageCreated):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -705,7 +707,6 @@ async def del_console(event: MessageCreated):
     await del_signal(event.message, state, id_signal)
 
 
-# TODO: not check
 @router.message_created(Command("debug"))
 async def debug_console(event: MessageCreated):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -740,7 +741,6 @@ async def debug_console(event: MessageCreated):
         return
 
 
-# TODO: not check
 @router.message_created(Command("long5"))
 async def long5_console(event: MessageCreated):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -771,7 +771,6 @@ async def long5_console(event: MessageCreated):
     await add_signal(event.message, state, command_args, "long5", None)
 
 
-# TODO: not check
 @router.message_created(F.message.body.text)
 async def all_message(event: MessageCreated):
     state = FSMContextLike(storage, int(config('MAX_USER_ID')))
@@ -791,7 +790,13 @@ async def all_message(event: MessageCreated):
 def get_webhook_handler(update_type: str, key: str):
     """Возвращает хендлер для webhook или None"""
     handlers_map = WEBHOOK_ROUTERS.get(update_type, {})
-    handler_name = handlers_map.get(key)
+    if key.startswith('typesignal_'):
+        handler_name = handlers_map.get('typesignal_')
+    elif key.startswith('ticker_'):
+        handler_name = handlers_map.get('ticker_')
+    else:
+        handler_name = handlers_map.get(key)
+
     if handler_name:
         return globals().get(handler_name)
     return None

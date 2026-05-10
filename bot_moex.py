@@ -91,31 +91,12 @@ async def handle_webhook(request):
             if handler:
                 await handler(event)
             else:
-                # Для остальных сообщений (FSM, ввод значений)
-                from basic_handlers import all_message
-                await all_message(event)
-
-            # TODO: del
-            # # Обработка команд через ваш роутер
-            # elif text.startswith('/del'):
-            #     from basic_handlers import del_console
-            #     await del_console(event)
-            # elif text.startswith('/debug'):
-            #     from basic_handlers import debug_console
-            #     await debug_console(event)
-            # elif text.startswith('/long5'):
-            #     from basic_handlers import long5_console
-            #     await long5_console(event)
-            # else:
-            #     # Для остальных сообщений (например, ввод значений для сигналов)
-            #     from basic_handlers import all_message
-            #     await all_message(event)
-
+                # Для остальных сообщений (FSM, ввод значений (для установки сигнала, удаления сигнала))
+                await basic_handlers.all_message(event)
         elif update_type == 'bot_started':
             event = BotStarted(**data)
             event.bot = bot
             await basic_handlers.handle_bot_started(event)
-
         elif update_type == 'message_callback':
             event = MessageCallback(**data)
             event.message.bot = bot
@@ -129,23 +110,6 @@ async def handle_webhook(request):
                 await handler(event)
             else:
                 logger.warning(f"Unknown callback payload: {payload}")
-
-            # elif payload == 'cmd_add_signal':
-            #     from basic_handlers import callback_add_signal
-            #     await callback_add_signal(event)
-            # elif payload == 'cmd_del_signal':
-            #     from basic_handlers import callback_del_signal
-            #     await callback_del_signal(event)
-            # elif payload.startswith('typesignal_'):
-            #     from basic_handlers import handle_set_type_signal
-            #     await handle_set_type_signal(event)
-            # elif payload.startswith('ticker_'):
-            #     from basic_handlers import handle_set_ticker
-            #     await handle_set_ticker(event)
-            # elif payload == 'cancel_signal':
-            #     from basic_handlers import handle_cancel_signal
-            #     await handle_cancel_signal(event)
-
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
 
