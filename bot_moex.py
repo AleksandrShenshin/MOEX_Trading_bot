@@ -1,4 +1,5 @@
 import sys
+import ssl
 import aiohttp
 import asyncio
 import logging
@@ -27,10 +28,15 @@ async def setup_webhook_subscription():
         "secret": webhook_secret
     }
 
-    async with aiohttp.ClientSession() as session:
+    # Явно указываем для python путь к системным сертификатом (где хранятся сертификаты Минцифры),
+    # по умолчанию python использовал свой собственный файл сертификатов
+    ssl_context = ssl.create_default_context(cafile='/usr/lib/ssl/certs/ca-certificates.crt')
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+    async with aiohttp.ClientSession(connector=connector) as session:
         # 1. Сначала проверим, есть ли уже активная подписка
         async with session.get(
-                "https://platform-api.max.ru/subscriptions",
+                "https://platform-api2.max.ru/subscriptions",
                 headers={"Authorization": token}
         ) as resp:
             if resp.status == 200:
@@ -44,7 +50,7 @@ async def setup_webhook_subscription():
         # 2. Если подписки нет, создаем новую
         logger.warning("Creating new webhook subscription...")
         async with session.post(
-                "https://platform-api.max.ru/subscriptions",
+                "https://platform-api2.max.ru/subscriptions",
                 headers={"Authorization": token, "Content-Type": "application/json"},
                 json=subscription_data
         ) as resp:
