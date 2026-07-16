@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import errno
 import logging
@@ -10,9 +11,34 @@ LOG_FILE = os.path.join(os.path.dirname(__file__), "log.txt")
 
 
 def send_max_message(text: str) -> None:
+    """Отправляет сообщение в MAX через API."""
     msg = f"🐦‍🔥 Strazh bot: {text}"
-    requests.post("https://platform-api.max.ru/messages", params={"user_id": config('MAX_USER_ID')}, json={"text": msg},
-                  headers={"Authorization": config('MAX_BOT_TOKEN'), "Content-Type": "application/json"}, timeout=10)
+
+    if sys.platform == "win32":
+        # только для тестов на Windows временно отключаем проверку SSL
+        ca_bundle = False
+    elif sys.platform == "linux":
+        # Явно указываем для python путь к системным сертификатом (где хранятся сертификаты Минцифры),
+        # по умолчанию python использовал свой собственный файл сертификатов
+        ca_bundle = '/usr/lib/ssl/certs/ca-certificates.crt'
+
+    try:
+        response = requests.post(
+            "https://platform-api2.max.ru/messages",
+            params={"user_id": config('MAX_USER_ID')},
+            json={"text": msg},
+            headers={
+                "Authorization": config('MAX_BOT_TOKEN'),
+                "Content-Type": "application/json"
+            },
+            timeout=10,
+            verify=ca_bundle
+        )
+        response.raise_for_status()
+    except requests.exceptions.SSLError as e:
+        logging.error(f"SSL Error: {e}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Failed to send message: {e}")
 
 
 def pid_exists(pid: int) -> tuple[bool, str]:
