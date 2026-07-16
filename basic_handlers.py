@@ -5,7 +5,7 @@ import t_invest_lib.tinv as tinv
 import logging
 from decouple import config
 from maxapi import F, Router
-from maxapi.types import MessageCreated, MessageCallback, Command, CallbackButton, ButtonsPayload, Attachment
+from maxapi.types import BotStarted, MessageCreated, MessageCallback, Command, CallbackButton, ButtonsPayload, Attachment
 from maxapi.enums.intent import Intent
 from general import get_support_instruments, get_support_signals, get_precision_from_value, update_current_ticker, moex_infinite_loop
 from general import lock_state, storage
@@ -15,6 +15,57 @@ logger = logging.getLogger(__name__)
 
 # Все роутеры нужно именовать так, чтобы не было конфликтов
 router = Router()
+
+WEBHOOK_ROUTERS = {
+    'message_created': {
+        '/start': 'cmd_start',
+        '/menu': 'cmd_menu',
+        '/help': 'cmd_help',
+        '/stop': 'cmd_stop',
+        '/get_list_ticker': 'get_support_ticker',
+        '/gs': 'get_list_signal',
+        '/set': 'set_console',
+        '/del': 'del_console',
+        '/debug': 'debug_console',
+        '/long5': 'long5_console',
+    },
+    'message_callback': {
+        'cmd_get_list_signal': 'get_list_signal',
+        'cmd_add_signal': 'callback_add_signal',
+        'typesignal_': 'handle_set_type_signal',
+        'ticker_': 'handle_set_ticker',
+        'cancel_signal': 'handle_cancel_signal',
+        'cmd_del_signal': 'callback_del_signal',
+        'cmd_help': 'cmd_help',
+    }
+}
+
+
+# Обработчик нажатия кнопки "Начать" (первый запуск)
+@router.bot_started()
+async def handle_bot_started(event: BotStarted):
+    """Вызывается когда пользователь нажимает 'Начать'"""
+    user = event.user
+    name = getattr(user, 'first_name', None) or 'friend'
+
+    if str(user.user_id) == config('MAX_USER_ID'):
+        logger.warning(f"New user: {name} (ID: {user.user_id})")
+
+        await event.bot.send_message(
+            chat_id=event.chat_id,
+            text=f"👋 Привет, {name}!\n\n"
+                 "Для запуска бота /start\n\n"
+                 "Используйте /help для справки."
+        )
+    else:
+        logger.warning(f"Access denied: {name} (ID: {user.user_id})")
+
+        # 🛑 Нет доступа
+        await event.bot.send_message(
+            chat_id=event.chat_id,
+            text="❌ Доступ запрещён!\n\n"
+                 "Этот бот доступен только для авторизованных пользователей.",
+        )
 
 
 def create_main_menu():
@@ -58,11 +109,10 @@ def create_main_menu():
     return Attachment(type="inline_keyboard", payload=buttons_payload)
 
 
-# TODO: перед исполнением команд добавить проверку user_id
 # Хэндлер на команду /start
 @router.message_created(Command("start"))
 async def cmd_start(event: MessageCreated):
-    user_id = event.from_user.user_id
+    user_id = event.message.sender.user_id
     state = FSMContextLike(storage, user_id)
     if str(user_id) != config('MAX_USER_ID'):
         await event.message.answer(
@@ -77,7 +127,7 @@ async def cmd_start(event: MessageCreated):
     lock_state.acquire()
     await state.clear()
     await state.update_data(bot=event.bot)
-    await state.update_data(chat_id=event.chat.chat_id)
+    await state.update_data(chat_id=event.message.recipient.chat_id)
     await state.update_data(debug=None)
     lock_state.release()
 
@@ -114,7 +164,7 @@ async def cmd_start(event: MessageCreated):
 
 @router.message_created(Command("stop"))
 async def cmd_stop(event: MessageCreated):
-    user_id = event.from_user.user_id
+    user_id = event.message.sender.user_id
     state = FSMContextLike(storage, user_id)
     if str(user_id) != config('MAX_USER_ID'):
         await event.message.answer(
@@ -192,11 +242,10 @@ async def get_support_ticker(event: MessageCreated):
     await event.message.answer(support_ticker)
 
 
-@router.message_created(Command("get_signals"))
+@router.message_created(Command("gs"))
 @router.message_callback(F.callback.payload == "cmd_get_list_signal")
 async def get_list_signal(event: MessageCreated):
-    user_id = event.from_user.user_id
-    state = FSMContextLike(storage, user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     lock_state.acquire()
     all_data = await state.get_data()
@@ -240,7 +289,7 @@ async def get_list_signal(event: MessageCreated):
 
 @router.message_created(Command("set"))
 async def set_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split(maxsplit=1)
@@ -311,9 +360,7 @@ async def state_clear_soft(state):
 
 @router.message_callback(F.callback.payload == "cmd_add_signal")
 async def callback_add_signal(event: MessageCallback):
-    user_id = event.from_user.user_id
-    state = FSMContextLike(storage, user_id)
-
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
     await state_clear_soft(state)
 
     # Собираем кнопки: 2 в ряд, как builder.adjust(2)
@@ -346,8 +393,7 @@ async def callback_add_signal(event: MessageCallback):
 
 @router.message_callback(F.callback.payload.startswith("typesignal_"))
 async def handle_set_type_signal(event: MessageCallback):
-    user_id = event.from_user.user_id
-    state = FSMContextLike(storage, user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     type_signal = event.callback.payload.split("_", 1)[1]
 
@@ -405,7 +451,7 @@ async def handle_set_type_signal(event: MessageCallback):
 
 @router.message_callback(F.callback.payload.startswith("ticker_"))
 async def handle_set_ticker(event: MessageCallback):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     ticker = event.callback.payload.split("_", 1)[1]
 
@@ -466,7 +512,7 @@ async def handle_set_ticker(event: MessageCallback):
 
 @router.message_callback(F.callback.payload == "cancel_signal")
 async def handle_cancel_signal(event: MessageCallback):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
     await event.bot.delete_message(message_id=event.message.body.mid)
     await state_clear_soft(state)
 
@@ -586,7 +632,7 @@ async def form_add_signal(event, state):
 
 @router.message_callback(F.callback.payload == "cmd_del_signal")
 async def callback_del_signal(event: MessageCallback):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     # Кнопка "Отмена"
     buttons = [[
@@ -642,7 +688,7 @@ async def form_del_id(event, state):
 
 @router.message_created(Command("del"))
 async def del_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split(maxsplit=1)
@@ -663,7 +709,7 @@ async def del_console(event: MessageCreated):
 
 @router.message_created(Command("debug"))
 async def debug_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split()
@@ -697,7 +743,7 @@ async def debug_console(event: MessageCreated):
 
 @router.message_created(Command("long5"))
 async def long5_console(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
 
     full_text = (event.message.body.text or "").strip()
     parts = full_text.split(maxsplit=1)
@@ -727,7 +773,8 @@ async def long5_console(event: MessageCreated):
 
 @router.message_created(F.message.body.text)
 async def all_message(event: MessageCreated):
-    state = FSMContextLike(storage, event.from_user.user_id)
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
+
     lock_state.acquire()
     curr_state = await state.get_state()
     lock_state.release()
@@ -737,3 +784,19 @@ async def all_message(event: MessageCreated):
         await form_del_id(event, state)
     else:
         await event.message.answer(f"Добавить парсинг сообщение: {event.message.body.text} -- консоль")
+
+
+# Функция для получения хендлера по типу и ключу
+def get_webhook_handler(update_type: str, key: str):
+    """Возвращает хендлер для webhook или None"""
+    handlers_map = WEBHOOK_ROUTERS.get(update_type, {})
+    if key.startswith('typesignal_'):
+        handler_name = handlers_map.get('typesignal_')
+    elif key.startswith('ticker_'):
+        handler_name = handlers_map.get('ticker_')
+    else:
+        handler_name = handlers_map.get(key)
+
+    if handler_name:
+        return globals().get(handler_name)
+    return None

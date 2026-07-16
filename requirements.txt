@@ -1,4 +1,6 @@
 maxapi==0.9.17
+fastapi==0.136.1
+uvicorn==0.46.0
 python-decouple==3.8
 requests==2.32.5
 t-tech-investments
