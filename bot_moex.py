@@ -15,6 +15,8 @@ bot = Bot(token=config('MAX_BOT_TOKEN'))
 webhook_secret = config('WEBHOOK_SECRET')
 max_user_id = config('MAX_USER_ID')
 
+# TODO: проверять рабочий или выходной день в Америке
+
 
 async def setup_webhook_subscription():
     """Проверяет и создает webhook-подписку при запуске бота."""
