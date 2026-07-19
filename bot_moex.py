@@ -1,3 +1,4 @@
+import os
 import sys
 import ssl
 import aiohttp
@@ -6,6 +7,7 @@ import logging
 import basic_handlers
 from aiohttp import web
 from decouple import config
+from f_settings import file_settings, create_f_settings
 from basic_handlers import router
 from maxapi import Bot, Dispatcher
 from maxapi.types import BotStarted, MessageCreated, MessageCallback
@@ -126,6 +128,12 @@ async def handle_webhook(request):
 
 async def main():
     logger.warning("Bot is run...")
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    settings_path = os.path.join(current_dir, file_settings)
+    if not os.path.isfile(settings_path):
+        logger.warning(f"Create file settings {file_settings}")
+        create_f_settings()
 
     if sys.platform == "win32":
         # Для отладки кода под windows
