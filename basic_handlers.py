@@ -1,6 +1,7 @@
 import os
 import asyncio
 import journal
+import f_settings
 import t_invest_lib.tinv as tinv
 import logging
 from decouple import config
@@ -130,6 +131,17 @@ async def cmd_start(event: MessageCreated):
     await state.update_data(chat_id=event.message.recipient.chat_id)
     await state.update_data(debug=None)
     lock_state.release()
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    settings_path = os.path.join(current_dir, f_settings.file_settings)
+    if not os.path.isfile(settings_path):
+        res = await f_settings.create_f_settings()
+        if not res:
+            logger.warning(f"Create file settings {f_settings.file_settings}")
+        else:
+            logger.error(f"ERROR: create file settings {f_settings.file_settings}")
+            await event.message.answer(f"❌ Ошибка создания файла настроек {f_settings.file_settings} !")
+            return
 
     try:
         ret_val, err_msg = await update_current_ticker(state)

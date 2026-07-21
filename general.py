@@ -3,6 +3,7 @@ import copy
 import asyncio
 import journal
 import logging
+import f_settings
 from decouple import config
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
@@ -25,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 async def get_support_instruments():
-    return config('FUTURES_LIST', cast=lambda v: [s.strip() for s in v.split(',')])
+    data = await f_settings.get_f_settings()
+    return data.get("futures_list") or []
 
 
 async def get_support_signals():
