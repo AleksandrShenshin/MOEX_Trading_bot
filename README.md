@@ -20,7 +20,11 @@ _Price, Volume, Long5, Throws_ - название которое будет ви
 _param_ - -p - price, -v - volume, -c - long5, -t - trows  
 > - **CANDLE_FORTS** = BR, GD, SV, NG, MX, Si, BM, CR, RI, FF, SF, MM 	
 > - **CANDLE_MOEX** = SBER, VTBR, GAZP, GMKN, OZON, SMLT, YDEX, LKOH  
-
+> - **DFLT_FORTS_L5_COEFFICIENT** = 2.5
+> - **DFLT_FORTS_THROWS_LEN** = 40
+> - **DFLT_MOEX_L5_COEFFICIENT** = 2.5
+> - **DFLT_MOEX_THROWS_LEN** = 20
+> 
 > [!WARNING]
 > Для работы необходимо в директорию проекта установить следующие пакеты:  
 > `pip install -r requirements.txt`  
