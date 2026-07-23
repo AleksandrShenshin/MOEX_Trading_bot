@@ -16,6 +16,7 @@ webhook_secret = config('WEBHOOK_SECRET')
 max_user_id = config('MAX_USER_ID')
 
 # TODO: проверять рабочий или выходной день в Америке
+# TODO: len_throws_step перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
 
 
 async def setup_webhook_subscription():

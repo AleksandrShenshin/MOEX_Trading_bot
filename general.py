@@ -332,19 +332,21 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     #                               'task_stream': None,
     #                               'debug_info': 'off'}
 
+    f_settings_data = await f_settings.get_f_settings()
     if market == 'forts':
         list_tickers = []
-        list_short_tickers = config('CANDLE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_short_tickers = list(f_settings_data.get('forts', {}).keys())
         for short_ticker in list_short_tickers:
             status, ret_val, err_msg = await get_ticker_family(short_ticker)
             if status == 0:
                 list_tickers.append(ret_val['current_ticker'])
+                f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
             else:
                 return
             await asyncio.sleep(0.5)
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
-        list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_tickers = list(f_settings_data.get('moex', {}).keys())
 
     try:
         async with lock_data_throws:
@@ -361,6 +363,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                         data_tasks_throws[market]['tickers'][ticker_param['figi']] = {'ticker': ticker_param['ticker'],
                                                                                       'name': ticker_param['name'],
                                                                                       'precision': ticker_param['precision'],
+                                                                                      'throws_len': f_settings_data[market][ticker_param['ticker']].get('throws_len', 40),
                                                                                       'candle': {'high': None,
                                                                                                  'low': None,
                                                                                                  'open': None,
@@ -371,8 +374,6 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                     await asyncio.sleep(0.5)
                 data_tasks_throws[market]['task_stream'] = asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
 
-        # TODO: длину проброса разная для фьюч и акций, настройка через файл настроек
-        len_throws_step = 40    # TODO: перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
         while True:
             async with lock_data_throws:
                 debug_info = data_tasks_throws[market]['debug_info']
@@ -389,6 +390,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                 # поиск пробросов осуществляется анализом длины теней свечи в пунктах движения
                 # asd // cor — сколько шагов длины cor помещается в asd
                 trend = ""
+                len_throws_step = param_ticker['throws_len']
                 len_high_step = Decimal.from_float(param_ticker['candle']['high'] - max(param_ticker['candle']['open'], param_ticker['candle']['close'])) // param_ticker['precision']
                 len_low_step = Decimal.from_float(min(param_ticker['candle']['open'], param_ticker['candle']['close']) - param_ticker['candle']['low']) // param_ticker['precision']
                 if len_high_step >= len_throws_step:
