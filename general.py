@@ -255,13 +255,18 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 data_tasks_long5[market]['task_stream'] = asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
 
         while True:
+            debug_str_bug = "L1 "           # TODO: debug search bug
             async with lock_data_long5:
+                debug_str_bug += "L2 "      # TODO: debug search bug
                 debug_info = data_tasks_long5[market]['debug_info']
                 upd_data_long5 = copy.deepcopy(data_tasks_long5[market]['tickers'])
                 if data_tasks_long5[market]['task_stream'].done():
+                    debug_str_bug += "L3 "  # TODO: debug search bug
                     await asyncio.sleep(5)
                     data_tasks_long5[market]['task_stream'] = asyncio.create_task(tinv.stream_list_figi_five_minute(lock_data_long5, data_tasks_long5, market))
                     logger.error(f"RESTART fetch_data_long5(): stream_list_figi_five_minute({market})")
+                debug_str_bug += "L4 "      # TODO: debug search bug
+            debug_str_bug += "L5 "          # TODO: debug search bug
             for figi, ticker_param in upd_data_long5.items():
                 if len(ticker_param['atr']) < 5:
                     continue
@@ -301,18 +306,24 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                        f"time_send_msg_atr={time_send_long5[figi]['time_send_msg_atr']}, "
                                        f"prev_bin={time_send_long5[figi]['prev_bin']}")
 
+            debug_str_bug += "L6 "      # TODO: debug search bug
             if debug_info == 'on':
+                debug_str_bug += "L7 "  # TODO: debug search bug
                 msg_to_print = f"DEBUG INFO Long5({market}): {ticker_param['ticker']} -- " \
                                f"high={ticker_param['cur_atr']['high']}, low={ticker_param['cur_atr']['low']}, " \
                                f"volume={ticker_param['cur_atr']['volume']}, time_received={ticker_param['cur_atr']['time_received']}"
                 logger.warning(msg_to_print)
                 await bot.send_message(chat_id=chat_id, text=msg_to_print)
+                debug_str_bug += "L8 "  # TODO: debug search bug
 
+            debug_str_bug += "L9 "      # TODO: debug search bug
             await asyncio.sleep(2)
     except asyncio.CancelledError:
         pass
     except Exception as e:
         logger.error(f"fetch_data_long5({market}): ERROR: {type(e).__name__}: {e}")
+        logger.error(f"L98: debug_str_bug[{market}] = {debug_str_bug}")  # TODO: debug search bug
+        logger.error(f"L99: data_tasks_long5[{market}] = {data_tasks_long5}")  # TODO: debug search bug
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
     finally:
         async with lock_data_long5:
