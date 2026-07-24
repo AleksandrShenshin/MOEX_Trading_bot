@@ -327,7 +327,8 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
     finally:
         async with lock_data_long5:
-            data_tasks_long5[market]['depends'].discard(asyncio.current_task())
+            if market in data_tasks_long5:
+                data_tasks_long5[market]['depends'].discard(asyncio.current_task())
         logger.warning(f"fetch_data_long5(): Finish task: long5 {market}")
         await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: long5 {market}")
 
