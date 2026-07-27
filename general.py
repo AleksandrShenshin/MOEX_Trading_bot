@@ -202,7 +202,7 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
 async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
     # data_tasks_long5 = {'forts': {},
     #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'atr_volume': [EE, RR, TT, AA, UU],
-    #                                                 'ticker': '', 'name': '', 'prev_bin': -1,
+    #                                                 'ticker': '', 'name': '', 'l5_coefficient': '', 'prev_bin': -1,
     #                                                 'cur_atr': {'high': None, 'low': None, 'volume': None,
     #                                                             'time_received': None}},
     #                                          figi: {}},
@@ -210,20 +210,21 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     #                              'task_stream': None
     #                              'debug_info': 'off'}
 
-    coefficient_multiplication_atr = 2.5
+    f_settings_data = await f_settings.get_f_settings()
     if market == 'forts':
         list_tickers = []
-        list_short_tickers = config('CANDLE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_short_tickers = list(f_settings_data.get('forts', {}).keys())
         for short_ticker in list_short_tickers:
             status, ret_val, err_msg = await get_ticker_family(short_ticker)
             if status == 0:
                 list_tickers.append(ret_val['current_ticker'])
+                f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
             else:
                 return
             await asyncio.sleep(0.5)
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
-        list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_tickers = list(f_settings_data.get('moex', {}).keys())
 
     time_send_long5 = {}
     try:
@@ -241,6 +242,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                                                                      'atr_volume': [],
                                                                                      'ticker': ticker_param['ticker'],
                                                                                      'name': ticker_param['name'],
+                                                                                     'l5_coefficient': f_settings_data[market][ticker_param['ticker']].get('l5_coefficient', 2.5),
                                                                                      'prev_bin': -1,
                                                                                      'cur_atr': {'high': None,
                                                                                                  'low': None,
@@ -271,6 +273,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 if len(ticker_param['atr']) < 5:
                     continue
                 else:
+                    coefficient_multiplication_atr = ticker_param['l5_coefficient']
                     average_atr = sum(ticker_param['atr']) / len(ticker_param['atr'])
                     average_vol = sum(ticker_param['atr_volume']) / len(ticker_param['atr_volume'])
                     if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average_atr * coefficient_multiplication_atr):
@@ -338,6 +341,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     #                      'moex': {'tickers': {figi: {'ticker': '',
     #                                                  'name': '',
     #                                                  'precision': '',
+    #                                                  'throws_len': '',
     #                                                  'candle': {'high': None, 'low': None, 'open': None, 'close': None, 'time_received': None}},
     #                                           figi: {}},
     #                               'depends': None,
