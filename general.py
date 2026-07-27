@@ -435,7 +435,8 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: throws {market}: Exception: {type(e).__name__}: {e}")
     finally:
         async with lock_data_throws:
-            data_tasks_throws[market]['depends'].discard(asyncio.current_task())
+            if market in data_tasks_throws:
+                data_tasks_throws[market]['depends'].discard(asyncio.current_task())
             logger.warning(f"fetch_data_throws(): Finish task: throws {market}")
             await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: throws {market}")
 
