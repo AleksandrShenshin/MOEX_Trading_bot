@@ -100,7 +100,7 @@ async def update_current_ticker(state):
 
 async def task_upd_curr_ticker(state):
     global lock_state
-    # TODO: в 23:55 снимать все задачи, в 7:00 запускать заново
+
     while True:
         ret_val, err_msg = await update_current_ticker(state)
         if ret_val:
