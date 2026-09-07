@@ -1,13 +1,15 @@
 import os
+import json
 import asyncio
 import journal
+import f_settings
 import t_invest_lib.tinv as tinv
 import logging
 from decouple import config
 from maxapi import F, Router
 from maxapi.types import BotStarted, MessageCreated, MessageCallback, Command, CallbackButton, ButtonsPayload, Attachment
 from maxapi.enums.intent import Intent
-from general import get_support_instruments, get_support_signals, get_precision_from_value, update_current_ticker, moex_infinite_loop
+from general import get_support_instruments, get_support_signals, get_precision_from_value, get_ticker_family, update_current_ticker, moex_infinite_loop
 from general import lock_state, storage
 from fsm_memory import FSMContextLike
 
@@ -28,6 +30,7 @@ WEBHOOK_ROUTERS = {
         '/del': 'del_console',
         '/debug': 'debug_console',
         '/long5': 'long5_console',
+        '/cfg': 'cfg_console',
     },
     'message_callback': {
         'cmd_get_list_signal': 'get_list_signal',
@@ -130,6 +133,17 @@ async def cmd_start(event: MessageCreated):
     await state.update_data(chat_id=event.message.recipient.chat_id)
     await state.update_data(debug=None)
     lock_state.release()
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    settings_path = os.path.join(current_dir, f_settings.file_settings)
+    if not os.path.isfile(settings_path):
+        res = await f_settings.create_f_settings()
+        if not res:
+            logger.warning(f"Create file settings {f_settings.file_settings}")
+        else:
+            logger.error(f"ERROR: create file settings {f_settings.file_settings}")
+            await event.message.answer(f"❌ Ошибка создания файла настроек {f_settings.file_settings} !")
+            return
 
     try:
         ret_val, err_msg = await update_current_ticker(state)
@@ -769,6 +783,149 @@ async def long5_console(event: MessageCreated):
         return
 
     await add_signal(event.message, state, command_args, "long5", None)
+
+
+@router.message_created(Command("cfg"))
+async def cfg_console(event: MessageCreated):
+    state = FSMContextLike(storage, int(config('MAX_USER_ID')))
+
+    full_text = (event.message.body.text or "").strip()
+    parts = full_text.split()
+    command_args = parts[1] if len(parts) > 1 else ""
+
+    f_settings_data = await f_settings.get_f_settings()
+    if command_args == "get" and len(parts) == 2:
+        # /cfg get
+        await event.message.answer(f"{json.dumps(f_settings_data, indent=4, ensure_ascii=False, sort_keys=False)}")
+    elif command_args == "get" and len(parts) == 4:
+        # /cfg get forts/moex ticker
+        if parts[2] in ['forts', 'moex']:
+            key = parts[3].lower() if parts[3] else parts[3]
+            data = f_settings_data.get(parts[2], {})
+            ticker = "Si" if key == "si" else parts[3].upper()
+            for k, v in data.items():
+                if k.lower() == key:
+                    await event.message.answer(f'"{parts[3].upper()}":{json.dumps(f_settings_data[parts[2]][ticker], indent=4, ensure_ascii=False, sort_keys=False)}')
+                    break
+            else:
+                await event.message.answer(f'❌ {parts[2]} "{ticker}" - тикер не найден!')
+        else:
+            await event.message.answer(f"❌ Использование: /cfg get forts/moex ticker")
+    elif command_args == "set" and len(parts) == 6:
+        # /cfg set forts/moex ticker l5_coefficient/throws_len value
+        if parts[2] in ['forts', 'moex']:
+            key = parts[3].lower() if parts[3] else parts[3]
+            data = f_settings_data.get(parts[2], {})
+            for k, v in data.items():
+                if k.lower() == key:
+                    ticker = "Si" if key == "si" else parts[3].upper()
+                    for param_ticker in ['l5_coefficient', 'throws_len']:
+                        if parts[4] == param_ticker:
+                            if param_ticker == 'l5_coefficient':
+                                value = parts[5].replace(',', '.')
+                                try:
+                                    value = float(value)
+                                except ValueError:
+                                    await event.message.answer(f"❌ Некорректное значение(float): {parts[5]} ")
+                                    break
+                            elif param_ticker == 'throws_len':
+                                try:
+                                    value = int(parts[5])
+                                except ValueError:
+                                    await event.message.answer(f"❌ Некорректное значение(int): {parts[5]} ")
+                                    break
+                            else:
+                                break
+
+                            f_settings_data[parts[2]][ticker][param_ticker] = value
+                            try:
+                                with open(f_settings.file_settings, "w", encoding="utf-8") as f:
+                                    json.dump(f_settings_data, f, indent=4, sort_keys=True, ensure_ascii=False)
+                                    await event.message.answer(f"📝 ✅ {parts[2]} {ticker} {param_ticker} {value} ")
+                            except Exception as e:
+                                logger.error(f"/cfg set: Unexpected error when writing settings: {e}")
+                                await event.message.answer(f"❌ /cfg set: Unexpected error when writing settings: {e}")
+                            break
+                    else:
+                        await event.message.answer(f"❌ Использование: /cfg set forts/moex ticker l5_coefficient/throws_len value")
+                        break
+                    break
+            else:
+                await event.message.answer(f'❌ {parts[2]} "{parts[3].upper()}" - тикер не найден!')
+        else:
+            await event.message.answer(f"❌ Использование: /cfg set forts/moex ticker l5_coefficient/throws_len value")
+    elif command_args == "add" and len(parts) == 4:
+        # /cfg add forts/moex ticker
+        if parts[2] in ['forts', 'moex']:
+            key = parts[3].lower() if parts[3] else parts[3]
+            if parts[2] == 'forts':
+                key = key[:2]
+            data = f_settings_data.get(parts[2], {})
+            for k, v in data.items():
+                if k.lower() == key:
+                    await event.message.answer(f'⚠️"{parts[3].upper()}" уже существует')
+                    break
+            else:
+                if parts[2] == 'forts':
+                    status, ret_val, err_msg = await get_ticker_family(parts[3])
+                    if status == 0:
+                        if ret_val['current_ticker']:
+                            f_settings_data["forts"][ret_val['current_ticker'][:2]] = {}
+                            f_settings_data["forts"][ret_val['current_ticker'][:2]]["l5_coefficient"] = config('DFLT_FORTS_L5_COEFFICIENT', cast=float)
+                            f_settings_data["forts"][ret_val['current_ticker'][:2]]["throws_len"] = config('DFLT_FORTS_THROWS_LEN', cast=int)
+                            try:
+                                with open(f_settings.file_settings, "w", encoding="utf-8") as f:
+                                    json.dump(f_settings_data, f, indent=4, sort_keys=True, ensure_ascii=False)
+                                    await event.message.answer(f"📝 ✅ add {parts[2]} {ret_val['current_ticker'][:2]}")
+                            except Exception as e:
+                                logger.error(f"/cfg add: Unexpected error when writing settings: {e}")
+                                await event.message.answer(f"❌ /cfg add: Unexpected error when writing settings: {e}")
+                        else:
+                            await event.message.answer(f'❌ {parts[2]} {parts[3]} не известен!')
+                    else:
+                        await event.message.answer(f"❌ /cfg add {parts[2]} {parts[3]} -- {err_msg}")
+                elif parts[2] == 'moex':
+                    status, ticker_param, err_msg = await tinv.get_param_instrument(parts[3], 'moex')
+                    if status:
+                        await event.message.answer(f"❌ /cfg add {parts[2]} {parts[3]} -- {err_msg}")
+                    else:
+                        f_settings_data["moex"][ticker_param['ticker']] = {}
+                        f_settings_data["moex"][ticker_param['ticker']]["l5_coefficient"] = config('DFLT_MOEX_L5_COEFFICIENT', cast=float)
+                        f_settings_data["moex"][ticker_param['ticker']]["throws_len"] = config('DFLT_MOEX_THROWS_LEN', cast=int)
+                        try:
+                            with open(f_settings.file_settings, "w", encoding="utf-8") as f:
+                                json.dump(f_settings_data, f, indent=4, sort_keys=True, ensure_ascii=False)
+                                await event.message.answer(f"📝 ✅ add {parts[2]} {ticker_param['ticker']}")
+                        except Exception as e:
+                            logger.error(f"/cfg add: Unexpected error when writing settings: {e}")
+                            await event.message.answer(f"❌ /cfg add: Unexpected error when writing settings: {e}")
+                else:
+                    await event.message.answer(f'❌ {parts[2]} не известен!')
+        else:
+            await event.message.answer(f"❌ Использование: /cfg add forts/moex ticker")
+    elif command_args == "del" and len(parts) == 4:
+        # /cfg del forts/moex ticker
+        if parts[2] in ['forts', 'moex']:
+            key = parts[3].upper() if parts[3] else parts[3]
+            if parts[2] == 'forts':
+                key = key[:2]
+                if key == 'SI':
+                    key = 'Si'
+            res_val = f_settings_data[parts[2]].pop(key, None)
+            if res_val:
+                try:
+                    with open(f_settings.file_settings, "w", encoding="utf-8") as f:
+                        json.dump(f_settings_data, f, indent=4, sort_keys=True, ensure_ascii=False)
+                        await event.message.answer(f"📝 ✅ del {parts[2]} {key}")
+                except Exception as e:
+                    logger.error(f"/cfg del: Unexpected error when writing settings: {e}")
+                    await event.message.answer(f"❌ /cfg del: Unexpected error when writing settings: {e}")
+            else:
+                await event.message.answer(f'❌ {parts[2]} {key} не найден!')
+        else:
+            await event.message.answer(f"❌ Использование: /cfg del forts/moex ticker")
+    else:
+        await event.message.answer(f"❌ {full_text} - не известный параметр")
 
 
 @router.message_created(F.message.body.text)

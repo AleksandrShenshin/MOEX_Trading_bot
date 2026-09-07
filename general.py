@@ -3,6 +3,7 @@ import copy
 import asyncio
 import journal
 import logging
+import f_settings
 from decouple import config
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
@@ -25,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 async def get_support_instruments():
-    return config('FUTURES_LIST', cast=lambda v: [s.strip() for s in v.split(',')])
+    data = await f_settings.get_f_settings()
+    return data.get("futures_list") or []
 
 
 async def get_support_signals():
@@ -98,7 +100,7 @@ async def update_current_ticker(state):
 
 async def task_upd_curr_ticker(state):
     global lock_state
-    # TODO: в 23:55 снимать все задачи, в 7:00 запускать заново
+
     while True:
         ret_val, err_msg = await update_current_ticker(state)
         if ret_val:
@@ -200,7 +202,7 @@ async def fetch_data_ticker(lock, shared_tasks, param_signal, bot, chat_id):
 async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_id):
     # data_tasks_long5 = {'forts': {},
     #                     'moex': {'tickers': {figi: {'atr': [XX, YY, ZZ, FF, SS], 'atr_volume': [EE, RR, TT, AA, UU],
-    #                                                 'ticker': '', 'name': '', 'prev_bin': -1,
+    #                                                 'ticker': '', 'name': '', 'l5_coefficient': '', 'prev_bin': -1,
     #                                                 'cur_atr': {'high': None, 'low': None, 'volume': None,
     #                                                             'time_received': None}},
     #                                          figi: {}},
@@ -208,20 +210,21 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     #                              'task_stream': None
     #                              'debug_info': 'off'}
 
-    coefficient_multiplication_atr = 2.5
+    f_settings_data = await f_settings.get_f_settings()
     if market == 'forts':
         list_tickers = []
-        list_short_tickers = config('CANDLE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_short_tickers = list(f_settings_data.get('forts', {}).keys())
         for short_ticker in list_short_tickers:
             status, ret_val, err_msg = await get_ticker_family(short_ticker)
             if status == 0:
                 list_tickers.append(ret_val['current_ticker'])
+                f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
             else:
                 return
             await asyncio.sleep(0.5)
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
-        list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_tickers = list(f_settings_data.get('moex', {}).keys())
 
     time_send_long5 = {}
     try:
@@ -239,6 +242,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                                                                                      'atr_volume': [],
                                                                                      'ticker': ticker_param['ticker'],
                                                                                      'name': ticker_param['name'],
+                                                                                     'l5_coefficient': f_settings_data[market][ticker_param['ticker']].get('l5_coefficient', 2.5),
                                                                                      'prev_bin': -1,
                                                                                      'cur_atr': {'high': None,
                                                                                                  'low': None,
@@ -264,6 +268,7 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
                 if len(ticker_param['atr']) < 5:
                     continue
                 else:
+                    coefficient_multiplication_atr = ticker_param['l5_coefficient']
                     average_atr = sum(ticker_param['atr']) / len(ticker_param['atr'])
                     average_vol = sum(ticker_param['atr_volume']) / len(ticker_param['atr_volume'])
                     if (float(ticker_param['cur_atr']['high']) - float(ticker_param['cur_atr']['low'])) >= (average_atr * coefficient_multiplication_atr):
@@ -314,7 +319,8 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
     finally:
         async with lock_data_long5:
-            data_tasks_long5[market]['depends'].discard(asyncio.current_task())
+            if market in data_tasks_long5:
+                data_tasks_long5[market]['depends'].discard(asyncio.current_task())
         logger.warning(f"fetch_data_long5(): Finish task: long5 {market}")
         await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: long5 {market}")
 
@@ -324,25 +330,28 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     #                      'moex': {'tickers': {figi: {'ticker': '',
     #                                                  'name': '',
     #                                                  'precision': '',
+    #                                                  'throws_len': '',
     #                                                  'candle': {'high': None, 'low': None, 'open': None, 'close': None, 'time_received': None}},
     #                                           figi: {}},
     #                               'depends': None,
     #                               'task_stream': None,
     #                               'debug_info': 'off'}
 
+    f_settings_data = await f_settings.get_f_settings()
     if market == 'forts':
         list_tickers = []
-        list_short_tickers = config('CANDLE_FORTS', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_short_tickers = list(f_settings_data.get('forts', {}).keys())
         for short_ticker in list_short_tickers:
             status, ret_val, err_msg = await get_ticker_family(short_ticker)
             if status == 0:
                 list_tickers.append(ret_val['current_ticker'])
+                f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
             else:
                 return
             await asyncio.sleep(0.5)
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
-        list_tickers = config('CANDLE_MOEX', cast=lambda v: [s.strip() for s in v.split(',')])
+        list_tickers = list(f_settings_data.get('moex', {}).keys())
 
     try:
         async with lock_data_throws:
@@ -359,6 +368,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                         data_tasks_throws[market]['tickers'][ticker_param['figi']] = {'ticker': ticker_param['ticker'],
                                                                                       'name': ticker_param['name'],
                                                                                       'precision': ticker_param['precision'],
+                                                                                      'throws_len': f_settings_data[market][ticker_param['ticker']].get('throws_len', 40),
                                                                                       'candle': {'high': None,
                                                                                                  'low': None,
                                                                                                  'open': None,
@@ -369,8 +379,6 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                     await asyncio.sleep(0.5)
                 data_tasks_throws[market]['task_stream'] = asyncio.create_task(tinv.stream_get_last_5sec_candle(lock_data_throws, data_tasks_throws, market))
 
-        # TODO: длину проброса разная для фьюч и акций, настройка через файл настроек
-        len_throws_step = 40    # TODO: перенести в .env файл, добавить возможность изменения через bot (создать bot_settings.json)
         while True:
             async with lock_data_throws:
                 debug_info = data_tasks_throws[market]['debug_info']
@@ -387,6 +395,7 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
                 # поиск пробросов осуществляется анализом длины теней свечи в пунктах движения
                 # asd // cor — сколько шагов длины cor помещается в asd
                 trend = ""
+                len_throws_step = param_ticker['throws_len']
                 len_high_step = Decimal.from_float(param_ticker['candle']['high'] - max(param_ticker['candle']['open'], param_ticker['candle']['close'])) // param_ticker['precision']
                 len_low_step = Decimal.from_float(min(param_ticker['candle']['open'], param_ticker['candle']['close']) - param_ticker['candle']['low']) // param_ticker['precision']
                 if len_high_step >= len_throws_step:
@@ -419,7 +428,8 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
         await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: throws {market}: Exception: {type(e).__name__}: {e}")
     finally:
         async with lock_data_throws:
-            data_tasks_throws[market]['depends'].discard(asyncio.current_task())
+            if market in data_tasks_throws:
+                data_tasks_throws[market]['depends'].discard(asyncio.current_task())
             logger.warning(f"fetch_data_throws(): Finish task: throws {market}")
             await bot.send_message(chat_id=chat_id, text=f"⛳ Завершена задача: throws {market}")
 

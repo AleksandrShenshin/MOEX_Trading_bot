@@ -16,6 +16,7 @@ webhook_secret = config('WEBHOOK_SECRET')
 max_user_id = config('MAX_USER_ID')
 
 # TODO: проверять рабочий или выходной день в Америке
+# TODO: Long5 при запуске подсчитывать атр с начала торговой сессии
 
 
 async def setup_webhook_subscription():
