@@ -9,7 +9,6 @@ from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 import t_invest_lib.tinv as tinv
-import iss_moex.iss_moex as iss_moex
 from fsm_memory import MemoryStorageLike, FSMContextLike
 
 shared_tasks = {}
@@ -59,23 +58,21 @@ async def get_precision_from_value(value):
 async def get_ticker_family(short_ticker):
     DAYS_BEFORE_EXCHANGE = 4
     ticker_family = {'all_list': '', 'current_ticker': ''}
-    list_ticker = iss_moex.get_list_definite_futures(short_ticker)
-    ticker_family['all_list'] = list_ticker
-    for full_ticker in list_ticker:
+    status, list_ticker, err_msg = await tinv.get_list_definite_futures(short_ticker)
+    if status != 0:
+        return -1, None, f"get_ticker_family(): {err_msg}"
+    ticker_family['all_list'] = list(list_ticker.keys())
+    for full_ticker, data_fut in list_ticker.items():
         try:
-            data_fut = iss_moex.get_data_future(full_ticker)
-            if len(data_fut) == 0:
-                continue
-
             if len(ticker_family['current_ticker']) == 0:
-                if (datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d') - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):
+                if (data_fut['lasttradedate'] - datetime.now(timezone.utc)) > timedelta(days=DAYS_BEFORE_EXCHANGE):
                     ticker_family['current_ticker'] = data_fut['ticker']
-                    date_in_current_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
+                    date_in_current_ticker = data_fut['lasttradedate']
             else:
-                date_next_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
-                if date_next_ticker < date_in_current_ticker and (date_next_ticker - datetime.now()) > timedelta(days=DAYS_BEFORE_EXCHANGE):
+                date_next_ticker = data_fut['lasttradedate']
+                if date_next_ticker < date_in_current_ticker and (date_next_ticker - datetime.now(timezone.utc)) > timedelta(days=DAYS_BEFORE_EXCHANGE):
                     ticker_family['current_ticker'] = data_fut['ticker']
-                    date_in_current_ticker = datetime.strptime(data_fut['lasttradedate'], '%Y-%m-%d')
+                    date_in_current_ticker = data_fut['lasttradedate']
         except KeyError as e:
             return -1, None, f"get_ticker_family(): KeyError: {e}"
     return 0, ticker_family, ''
