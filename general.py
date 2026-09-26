@@ -59,7 +59,7 @@ async def get_precision_from_value(value):
 async def get_ticker_family(short_ticker):
     DAYS_BEFORE_EXCHANGE = 4
     ticker_family = {'all_list': '', 'current_ticker': ''}
-    list_ticker = iss_moex.get_list_definite_futures(short_ticker)
+    list_ticker = await tinv.get_list_definite_futures(short_ticker)
     ticker_family['all_list'] = list_ticker
     for full_ticker in list_ticker:
         try:
