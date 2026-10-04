@@ -55,12 +55,22 @@ async def get_precision_from_value(value):
         return -1, f"ERROR: get_precision_from_value() not correct format value for partition {value}"
 
 
-async def get_ticker_family(short_ticker):
+async def get_ticker_family(short_ticker, list_all_fut=None):
     DAYS_BEFORE_EXCHANGE = 4
     ticker_family = {'all_list': '', 'current_ticker': ''}
-    status, list_ticker, err_msg = await tinv.get_list_definite_futures(short_ticker)
-    if status != 0:
-        return -1, None, f"get_ticker_family(): {err_msg}"
+    if list_all_fut is None:
+        status, list_ticker, err_msg = await tinv.get_list_definite_futures(short_ticker)
+        if status != 0:
+            return -1, None, f"get_ticker_family(): {err_msg}"
+    else:
+        list_ticker = {}
+        for future in list_all_fut:
+            if future.ticker.lower().startswith(short_ticker.lower()):
+                list_ticker[future.ticker] = {
+                    'ticker': future.ticker,
+                    'minstep': await tinv.val_to_decimal(future.min_price_increment),
+                    'lasttradedate': future.last_trade_date
+                }
     ticker_family['all_list'] = list(list_ticker.keys())
     for full_ticker, data_fut in list_ticker.items():
         try:
@@ -211,14 +221,21 @@ async def fetch_data_long5(lock_data_long5, data_tasks_long5, market, bot, chat_
     if market == 'forts':
         list_tickers = []
         list_short_tickers = list(f_settings_data.get('forts', {}).keys())
-        for short_ticker in list_short_tickers:
-            status, ret_val, err_msg = await get_ticker_family(short_ticker)
-            if status == 0:
-                list_tickers.append(ret_val['current_ticker'])
-                f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
-            else:
-                return
-            await asyncio.sleep(0.5)
+        status, list_all_fut, err_msg = await tinv.get_all_futures()
+        if status == 0:
+            for short_ticker in list_short_tickers:
+                status, ret_val, err_msg = await get_ticker_family(short_ticker, list_all_fut)
+                if status == 0:
+                    list_tickers.append(ret_val['current_ticker'])
+                    f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
+                else:
+                    return
+                await asyncio.sleep(0.5)
+            list_all_fut = []
+        else:
+            logger.error(f"fetch_data_long5({market}): ERROR: {err_msg}")
+            await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: long5 {market}")
+            return
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
         list_tickers = list(f_settings_data.get('moex', {}).keys())
@@ -338,14 +355,21 @@ async def fetch_data_throws(lock_data_throws, data_tasks_throws, market, bot, ch
     if market == 'forts':
         list_tickers = []
         list_short_tickers = list(f_settings_data.get('forts', {}).keys())
-        for short_ticker in list_short_tickers:
-            status, ret_val, err_msg = await get_ticker_family(short_ticker)
-            if status == 0:
-                list_tickers.append(ret_val['current_ticker'])
-                f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
-            else:
-                return
-            await asyncio.sleep(0.5)
+        status, list_all_fut, err_msg = await tinv.get_all_futures()
+        if status == 0:
+            for short_ticker in list_short_tickers:
+                status, ret_val, err_msg = await get_ticker_family(short_ticker, list_all_fut)
+                if status == 0:
+                    list_tickers.append(ret_val['current_ticker'])
+                    f_settings_data['forts'][ret_val['current_ticker']] = f_settings_data['forts'].pop(short_ticker)
+                else:
+                    return
+                await asyncio.sleep(0.5)
+            list_all_fut = []
+        else:
+            logger.error(f"fetch_data_throws({market}): ERROR: {err_msg}")
+            await bot.send_message(chat_id=chat_id, text=f"❌ ОШИБКА: удалён сигнал: throws {market}")
+            return
     elif market == 'moex':
         # ['SBER', 'VTBR', 'GAZP', 'GMKN']
         list_tickers = list(f_settings_data.get('moex', {}).keys())
